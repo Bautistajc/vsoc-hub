@@ -1,0 +1,651 @@
+import { useState, useEffect } from "react";
+
+const EHS = "ehs@unity3d.com";
+const VSOC = "vsoc@unity3d.com";
+const RICHARD = "richard.waldrop@unity3d.com";
+const JOE = "joe.studley@unity3d.com";
+const ALICE = "alice.orme@unity3d.com";
+const HELPDESK = "https://helpdesk.unity3d.com/support/home";
+
+const composeUrl = (to, subject, cc) => {
+  let url = `https://mail.google.com/mail/?view=cm&to=${encodeURIComponent(Array.isArray(to) ? to.join(",") : to)}&su=${encodeURIComponent(subject)}`;
+  if (cc) url += `&cc=${encodeURIComponent(Array.isArray(cc) ? cc.join(",") : cc)}`;
+  return url;
+};
+
+const jiraUrl = (city) =>
+  `https://jira.unity3d.com/issues/?jql=project%3DGBPSD%20AND%20text~%22${encodeURIComponent(city)}%22%20AND%20status%20IN%20(Open%2C%20Closed%2C%20%22In%20Progress%22%2C%20Canceled%2C%20%22Waiting%20for%20Customer%22%2C%20Monitoring%2C%20%22Awaiting%20Approval%22%2C%20Notification%2C%20Pending)%20ORDER%20BY%20created%20DESC`;
+
+const tzMap = {
+  "EDT (UTC-4)": "America/New_York",
+  "PDT (UTC-7)": "America/Los_Angeles",
+  "CST (UTC+8)": "Asia/Shanghai",
+  "IST (UTC+5:30)": "Asia/Kolkata",
+  "KST (UTC+9)": "Asia/Seoul",
+  "SGT (UTC+8)": "Asia/Singapore",
+  "JST (UTC+9)": "Asia/Tokyo",
+  "BST (UTC+1)": "Europe/London",
+  "CEST (UTC+2)": "Europe/Paris",
+  "EEST (UTC+3)": "Europe/Helsinki",
+  "IDT (UTC+3)": "Asia/Jerusalem",
+};
+
+const offices = [
+  {
+    id: "CAN-Montreal", region: "AMER", flag: "🇨🇦", city: "Montreal", country: "Canada",
+    address: "1751 rue Richardson, suite 3500, Montreal, QC H3K 1G6",
+    timezone: "EDT (UTC-4)", accessControl: true, cctv: null, groundFloor: false,
+    physSecManager: "Joe Studley", managerEmail: JOE,
+    security: { hasOnsite: true, vendor: "Securitas", contacts: [
+      { name: "Securitas Guard", phone: "514 838 7517", note: "Mon 10am PST–Fri 10pm PST" },
+      { name: "Securitas Patrol", phone: "514 938 3433", note: "Fri 8pm PST–Mon 4am PST" },
+      { name: "Raadin Beedasy (Lead)", phone: "", note: "On Slack, M–F 0700–1500 EDT" },
+    ]},
+    contacts: [
+      { role: "Primary WE", name: "Steve Delmas", phone: "(514) 974-8034", email: "steve.delmas@unity3d.com" },
+      { role: "Secondary WE", name: "Marvin Polynice", phone: "(438) 503-9282", email: "marvin.polynice@unity3d.com" },
+      { role: "Alternate WE", name: "Russell Gagnon", phone: "(514) 358-1595", email: "russell.gagnon@unity3d.com" },
+    ],
+    tools: { confluence: "https://confluence.unity3d.com/spaces/HR/pages/500811170/Montreal+Office", gable: "https://app.gable.to/hq/67ec3b33ddb567ed81f2d112" },
+    travelBrief: "https://portal.max-security.com/city/Montreal(Canada)",
+    elasticSearch: "https://portal.max-security.com/elastic?view=list&text=Montreal",
+    notes: ""
+  },
+  {
+    id: "USA-Mountain View", region: "AMER", flag: "🇺🇸", city: "Mountain View", country: "USA",
+    address: "1975 W El Camino Real, Mountain View, CA 94040",
+    timezone: "PDT (UTC-7)", accessControl: false, cctv: false, groundFloor: false,
+    physSecManager: "Joe Studley", managerEmail: JOE,
+    security: { hasOnsite: false },
+    contacts: [
+      { role: "Primary WE", name: "Pending", phone: "Pending" },
+      { role: "Secondary WE", name: "Pending", phone: "Pending" },
+    ],
+    tools: { confluence: "https://confluence.unity3d.com/spaces/HR/pages/500811217/Mountain+View+Office", gable: "https://app.gable.to/hq/68f290111e23c8ec3d9ddf6c" },
+    notes: ""
+  },
+  {
+    id: "USA-Bellevue", region: "AMER", flag: "🇺🇸", city: "Bellevue", country: "USA",
+    address: "10900 NE 8th St, Floor 5, Bellevue, WA 98004",
+    timezone: "PDT (UTC-7)", accessControl: true, cctv: null, groundFloor: false,
+    physSecManager: "Joe Studley", managerEmail: JOE,
+    security: { hasOnsite: false },
+    contacts: [
+      { role: "Primary WE", name: "Russell Gagnon", phone: "(514) 358-1595", email: "russell.gagnon@unity3d.com" },
+      { role: "Alternate", name: "Roni Ivgi (Site Lead) / Yikun Xian (POC)", phone: "N/A" },
+    ],
+    tools: { confluence: null, gable: "https://app.gable.to/hq/69399d7dfaf662b19732c275" },
+    notes: ""
+  },
+  {
+    id: "USA-New York", region: "AMER", flag: "🇺🇸", city: "New York", country: "USA",
+    address: "817 Broadway, Floor 2, New York, NY 10003",
+    timezone: "EDT (UTC-4)", accessControl: false, cctv: true, groundFloor: false,
+    physSecManager: "Joe Studley", managerEmail: JOE,
+    security: { hasOnsite: false },
+    contacts: [
+      { role: "Primary WE", name: "Twaan Johnson", phone: "N/A", email: "twaan.johnson@unity3d.com" },
+      { role: "Secondary WE", name: "Russell Gagnon", phone: "(514) 358-1595", email: "russell.gagnon@unity3d.com" },
+    ],
+    tools: { confluence: "https://confluence.unity3d.com/spaces/HR/pages/500811211/New+York+City+Office", gable: "https://app.gable.to/hq/67f67b3ff50a19d8caf0f008" },
+    notes: ""
+  },
+  {
+    id: "USA-Pittsburgh", region: "AMER", flag: "🇺🇸", city: "Pittsburgh", country: "USA",
+    address: "Pending", timezone: "EDT (UTC-4)", accessControl: false, cctv: false, groundFloor: false,
+    physSecManager: "Joe Studley", managerEmail: JOE,
+    security: { hasOnsite: false },
+    contacts: [],
+    tools: { confluence: "https://confluence.unity3d.com/spaces/HR/pages/500811213/Pittsburgh+Office", gable: null },
+    notes: ""
+  },
+  {
+    id: "USA-San Francisco", region: "AMER", flag: "🇺🇸", city: "San Francisco", country: "USA",
+    address: "116 New Montgomery St, Suite 300, San Francisco, CA 94105",
+    timezone: "PDT (UTC-7)", accessControl: true, cctv: null, groundFloor: false,
+    physSecManager: "Joe Studley", managerEmail: JOE,
+    security: { hasOnsite: true, vendor: "Building Security", contacts: [
+      { name: "Whitney Villasana", phone: "925 995 8915", note: "7am–3pm M–F" },
+    ]},
+    contacts: [
+      { role: "Primary WE", name: "Mike Lee", phone: "N/A", email: "mike.lee@unity3d.com" },
+      { role: "Secondary WE", name: "Russell Gagnon", phone: "(514) 358-1595", email: "russell.gagnon@unity3d.com" },
+    ],
+    tools: { confluence: "https://confluence.unity3d.com/spaces/HR/pages/501426007/Visiting+the+San+Francisco+Office", gable: "https://app.gable.to/hq/67f3eb8de67d62b06cb71a83" },
+    notes: ""
+  },
+  {
+    id: "CHN-Beijing", region: "APAC", flag: "🇨🇳", city: "Beijing", country: "China",
+    address: "Pending", timezone: "CST (UTC+8)", accessControl: false, cctv: false, groundFloor: false,
+    physSecManager: "Joe Studley", managerEmail: JOE,
+    security: { hasOnsite: false },
+    contacts: [],
+    tools: { confluence: "https://confluence.unity3d.com/spaces/HR/pages/500811166/Beijing+Office", gable: "https://app.gable.to/hq/680a373426149832164cf229" },
+    notes: ""
+  },
+  {
+    id: "IND-Bengaluru", region: "APAC", flag: "🇮🇳", city: "Bengaluru", country: "India",
+    address: "Embassy Golf Link, Pebble Beach 4th Floor, Gate 2 Off Intermediate Ring Road, Bangalore 560071",
+    timezone: "IST (UTC+5:30)", accessControl: true, cctv: null, groundFloor: false,
+    physSecManager: "Joe Studley", managerEmail: JOE,
+    security: { hasOnsite: false },
+    contacts: [
+      { role: "Primary WE", name: "Uday Kumar A V", phone: "+91 9482896261", email: "uday.kumar@unity3d.com" },
+      { role: "Secondary WE", name: "Dishani Majumder", phone: "+91 7980243819", email: "dishani.majumder@unity3d.com" },
+      { role: "Alternate WE", name: "JE Chang", phone: "+82 1094573142", email: "je.chang@unity3d.com" },
+    ],
+    tools: { confluence: "https://confluence.unity3d.com/spaces/HR/pages/500811195/Bengaluru+Office", gable: "https://app.gable.to/hq/67f3e2ba58c729ebbf3effc6" },
+    notes: ""
+  },
+  {
+    id: "KOR-Seoul", region: "APAC", flag: "🇰🇷", city: "Seoul", country: "South Korea",
+    address: "21F Gangnam N Tower, 129 Teheran-ro, Gangnam-gu, Seoul 06133",
+    timezone: "KST (UTC+9)", accessControl: true, cctv: null, groundFloor: false,
+    physSecManager: "Joe Studley", managerEmail: JOE,
+    security: { hasOnsite: false },
+    contacts: [
+      { role: "Primary WE (C)", name: "Hyunjeong Lee", phone: "N/A", email: "hyunjeong.lee@unity3d.com" },
+      { role: "Secondary WE", name: "Tina Jang", phone: "+82-10-9489-9821", email: "tina.jang@unity3d.com" },
+      { role: "Alternate WE", name: "JE Chang", phone: "+82 1094573142", email: "je.chang@unity3d.com" },
+    ],
+    tools: { confluence: "https://confluence.unity3d.com/spaces/HR/pages/500811203/Seoul+Office", gable: "https://app.gable.to/hq/67f3ebd05bff751a484200fe" },
+    notes: ""
+  },
+  {
+    id: "SGP-Singapore", region: "APAC", flag: "🇸🇬", city: "Singapore", country: "Singapore",
+    address: "Pending", timezone: "SGT (UTC+8)", accessControl: false, cctv: false, groundFloor: false,
+    physSecManager: "Joe Studley", managerEmail: JOE,
+    security: { hasOnsite: false },
+    contacts: [],
+    tools: { confluence: "https://confluence.unity3d.com/spaces/HR/pages/500811264/Singapore+Office", gable: "https://app.gable.to/hq/6887c3e2f0d551f2092bf3ec" },
+    notes: ""
+  },
+  {
+    id: "JPN-Tokyo", region: "APAC", flag: "🇯🇵", city: "Tokyo", country: "Japan",
+    address: "GINZA SIX 8F, 6-10-1 Ginza, Chuo-ku, Tokyo 104-0061",
+    timezone: "JST (UTC+9)", accessControl: true, cctv: null, groundFloor: false,
+    physSecManager: "Joe Studley", managerEmail: JOE,
+    security: { hasOnsite: false },
+    contacts: [
+      { role: "Primary WE", name: "Satoko Endo", phone: "N/A", email: "satoko.endo@unity3d.com" },
+      { role: "Secondary WE", name: "JE Chang", phone: "+82 1094573142", email: "je.chang@unity3d.com" },
+    ],
+    tools: { confluence: "https://confluence.unity3d.com/spaces/HR/pages/500811199/Tokyo+Office", gable: "https://app.gable.to/hq/67f3f11e47085423d4525546" },
+    notes: "Add Koji Ohno only if issues related to NDA and/or Build Rooms."
+  },
+  {
+    id: "GBR-Brighton", region: "EMEA", flag: "🇬🇧", city: "Brighton", country: "UK",
+    address: "30 Station Street, The Brinell Building, Brighton, BN1 4RB",
+    timezone: "BST (UTC+1)", accessControl: null, cctv: null, groundFloor: null,
+    physSecManager: "Alice Orme", managerEmail: ALICE,
+    security: { hasOnsite: true, vendor: "Atlas Security", contacts: [
+      { name: "Atlas Security", phone: "+44 1273 916888", note: "Kevin Brown: kevin.brown@atlas-security.com" },
+    ]},
+    contacts: [
+      { role: "Primary WE", name: "Mia Clarke", phone: "+44 7456248540", email: "mia.clarke@unity3d.com" },
+      { role: "Secondary WE (C)", name: "Adelle Skilton", phone: "N/A", email: "adelle.skilton@unity3d.com" },
+      { role: "Alternate WE", name: "Karsten Grentoft", phone: "+45 30201228", email: "karsten.grentoft@unity3d.com" },
+    ],
+    tools: { confluence: "https://confluence.unity3d.com/spaces/HR/pages/500811207/Brighton+Office", gable: "https://app.gable.to/hq/67f3deae11b0e1a910b304d5" },
+    notes: ""
+  },
+  {
+    id: "FRA-Compiegne", region: "EMEA", flag: "🇫🇷", city: "Compiegne", country: "France",
+    address: "Pending", timezone: "CEST (UTC+2)", accessControl: false, cctv: false, groundFloor: false,
+    physSecManager: "Alice Orme", managerEmail: ALICE,
+    security: { hasOnsite: false },
+    contacts: [],
+    tools: { confluence: "https://confluence.unity3d.com/spaces/HR/pages/500811177/Compiegne+Office", gable: "https://app.gable.to/hq/67f3e6fe5bff751a4841e5e3" },
+    notes: ""
+  },
+  {
+    id: "DNK-Copenhagen", region: "EMEA", flag: "🇩🇰", city: "Copenhagen", country: "Denmark",
+    address: "Postgarden, Niels Hemmingsens Gade 24, 1153 Copenhagen, Denmark",
+    timezone: "CEST (UTC+2)", accessControl: true, cctv: null, groundFloor: false,
+    physSecManager: "Alice Orme", managerEmail: ALICE,
+    security: { hasOnsite: true, vendor: "Securitas", contacts: [
+      { name: "Securitas 24x7 SOC", phone: "011 454 343 4388", note: "24/7 coverage" },
+    ]},
+    contacts: [
+      { role: "Primary WE", name: "Marija Sojic", phone: "N/A", email: "marija.sojic@unity3d.com" },
+      { role: "Secondary WE", name: "Rasmus Hulkvist Larsen", phone: "+45 26820591", email: "rasmus.larsen@unity3d.com" },
+      { role: "Alternate WE", name: "Karsten Grentoft", phone: "+45 30201228", email: "karsten.grentoft@unity3d.com" },
+    ],
+    tools: { confluence: "https://confluence.unity3d.com/spaces/HR/pages/500811175/Copenhagen+Office", gable: "https://app.gable.to/hq/67f3e3877abd999b3dcff9ff" },
+    notes: ""
+  },
+  {
+    id: "FRA-Grenoble", region: "EMEA", flag: "🇫🇷", city: "Grenoble", country: "France",
+    address: "Pending", timezone: "CEST (UTC+2)", accessControl: false, cctv: false, groundFloor: false,
+    physSecManager: "Alice Orme", managerEmail: ALICE,
+    security: { hasOnsite: false },
+    contacts: [],
+    tools: { confluence: "https://confluence.unity3d.com/spaces/HR/pages/500811186/Grenoble+Office", gable: "https://app.gable.to/hq/67f3e8467abd999b3dd17d25" },
+    notes: ""
+  },
+  {
+    id: "FIN-Helsinki", region: "EMEA", flag: "🇫🇮", city: "Helsinki", country: "Finland",
+    address: "Kaivokatu 6, 6th & 7th floor, 00100, Helsinki, Finland",
+    timezone: "EEST (UTC+3)", accessControl: null, cctv: null, groundFloor: null,
+    physSecManager: "Alice Orme", managerEmail: ALICE,
+    security: { hasOnsite: true, vendor: "Securitas", contacts: [
+      { name: "Securitas", phone: "+358 040 632 4648", note: "vartijat@citycenter.fi" },
+    ]},
+    contacts: [
+      { role: "Primary WE", name: "Kikka Tiinanen", phone: "+358 452544993", email: "kikka.tiinanen@unity3d.com" },
+      { role: "Secondary WE", name: "Justina Rautio", phone: "+358 443282122", email: "justina.rautio@unity3d.com" },
+    ],
+    tools: { confluence: "https://confluence.unity3d.com/spaces/HR/pages/500811266/Helsinki+Office", gable: "https://app.gable.to/hq/67f3e88f58c729ebbf3f1f71" },
+    notes: ""
+  },
+  {
+    id: "FRA-Lille", region: "EMEA", flag: "🇫🇷", city: "Lille", country: "France",
+    address: "2 avenue des Saules, 59160, Lille, France",
+    timezone: "CEST (UTC+2)", accessControl: true, cctv: null, groundFloor: false,
+    physSecManager: "Alice Orme", managerEmail: ALICE,
+    security: { hasOnsite: false },
+    contacts: [
+      { role: "Primary WE", name: "Andreea Frasie", phone: "+33 189202740", email: "andreea.frasie@unity3d.com" },
+      { role: "Secondary WE", name: "Karsten Grentoft", phone: "+45 30201228", email: "karsten.grentoft@unity3d.com" },
+    ],
+    tools: { confluence: "https://confluence.unity3d.com/spaces/HR/pages/500811189/Lille+Office", gable: "https://app.gable.to/hq/67f3ea4511b0e1a910b36813" },
+    notes: ""
+  },
+  {
+    id: "GBR-London", region: "EMEA", flag: "🇬🇧", city: "London", country: "UK",
+    address: "Pending", timezone: "BST (UTC+1)", accessControl: null, cctv: null, groundFloor: null,
+    physSecManager: "Alice Orme", managerEmail: ALICE,
+    security: { hasOnsite: false },
+    contacts: [
+      { role: "Primary WE", name: "Emma Loftus", phone: "Pending", email: "emma.loftus@unity3d.com" },
+      { role: "Alternate WE", name: "Karsten Grentoft", phone: "+45 30201228", email: "karsten.grentoft@unity3d.com" },
+    ],
+    tools: { confluence: "https://confluence.unity3d.com/spaces/HR/pages/500811209/London+Office", gable: null },
+    notes: "Pending details."
+  },
+  {
+    id: "DEU-Munich", region: "EMEA", flag: "🇩🇪", city: "Munich", country: "Germany",
+    address: "Pending", timezone: "CEST (UTC+2)", accessControl: null, cctv: null, groundFloor: null,
+    physSecManager: "Alice Orme", managerEmail: ALICE,
+    security: { hasOnsite: false },
+    contacts: [],
+    tools: { confluence: "https://confluence.unity3d.com/spaces/HR/pages/500811193/Munich+Office", gable: null },
+    notes: ""
+  },
+  {
+    id: "FRA-Paris", region: "EMEA", flag: "🇫🇷", city: "Paris", country: "France",
+    address: "83-85 boulevard Vincent Auriol, 75013, Paris, France",
+    timezone: "CEST (UTC+2)", accessControl: true, cctv: null, groundFloor: false,
+    physSecManager: "Alice Orme", managerEmail: ALICE,
+    security: { hasOnsite: false },
+    contacts: [
+      { role: "Primary WE", name: "Andreea Frasie", phone: "+33 189202740", email: "andreea.frasie@unity3d.com" },
+      { role: "Secondary WE", name: "Karsten Grentoft", phone: "+45 30201228", email: "karsten.grentoft@unity3d.com" },
+    ],
+    tools: { confluence: "https://confluence.unity3d.com/spaces/HR/pages/500811191/Paris+Office", gable: "https://app.gable.to/hq/67f3eb085bff751a4841ff98" },
+    notes: ""
+  },
+  {
+    id: "SWE-Stockholm", region: "EMEA", flag: "🇸🇪", city: "Stockholm", country: "Sweden",
+    address: "Pending", timezone: "CEST (UTC+2)", accessControl: null, cctv: null, groundFloor: null,
+    physSecManager: "Alice Orme", managerEmail: ALICE,
+    security: { hasOnsite: false },
+    contacts: [],
+    tools: { confluence: "https://confluence.unity3d.com/spaces/HR/pages/500811205/Stockholm+Office", gable: "https://app.gable.to/hq/67f3f1cde67d62b06cb74a22" },
+    notes: "Pending details"
+  },
+  {
+    id: "GBR-Stratford-upon-Avon", region: "EMEA", flag: "🇬🇧", city: "Stratford-upon-Avon", country: "UK",
+    address: "Pending", timezone: "BST (UTC+1)", accessControl: null, cctv: null, groundFloor: null,
+    physSecManager: "Alice Orme", managerEmail: ALICE,
+    security: { hasOnsite: false },
+    contacts: [],
+    tools: { confluence: "https://confluence.unity3d.com/spaces/HR/pages/500803490/Stratford-Upon-Avon+Office", gable: "https://app.gable.to/hq/67f3f06947085423d4525385" },
+    notes: "Pending details"
+  },
+  {
+    id: "ISR-Tel Aviv", region: "EMEA", flag: "🇮🇱", city: "Tel Aviv", country: "Israel",
+    address: "Pending", timezone: "IDT (UTC+3)", accessControl: null, cctv: null, groundFloor: null,
+    physSecManager: "Alice Orme", managerEmail: ALICE,
+    security: { hasOnsite: false },
+    contacts: [],
+    tools: { confluence: "https://confluence.unity3d.com/spaces/HR/pages/500811197/Tel+Aviv+Office", gable: "https://app.gable.to/hq/67f3e9ea3423430964ad055a" },
+    notes: "Pending details"
+  },
+  {
+    id: "LTU-Vilnius", region: "EMEA", flag: "🇱🇹", city: "Vilnius", country: "Lithuania",
+    address: "Pending", timezone: "EEST (UTC+3)", accessControl: null, cctv: null, groundFloor: null,
+    physSecManager: "Alice Orme", managerEmail: ALICE,
+    security: { hasOnsite: false },
+    contacts: [],
+    tools: { confluence: "https://confluence.unity3d.com/spaces/HR/pages/500811201/Vilnius+Office", gable: "https://app.gable.to/hq/67f3f1cde67d62b06cb74a22" },
+    notes: "Pending details"
+  },
+];
+
+const regionColors = { AMER: "#378ADD", APAC: "#1D9E75", EMEA: "#D85A30" };
+const regionBg = { AMER: "#E6F1FB", APAC: "#E1F5EE", EMEA: "#FAECE7" };
+
+const globalDocs = [
+  { name: "VSOC Operations Document", url: "https://docs.google.com/document/d/1wROd18-jVzr0zu_Kv3Wxn2Y_U08faNaFBwj8X2UVlRs/edit?usp=sharing" },
+  { name: "Crisis Management Plan V1 VSOC Version", url: "https://docs.google.com/document/d/1Z4nbO0bpb113shunKQ28vuUqzwHyaqXfmvYjnBODgLc/edit?tab=t.0" },
+  { name: "Temporary SOPs", url: "https://docs.google.com/document/d/1p4Pi1AVXF5wzc9meg6O0bQ63Ju6gAUr2Iz7CmLnpjzQ/edit?tab=t.0" },
+  { name: "Physical Security Confluence Page", url: "https://confluence.unity3d.com/spaces/HR/pages/500814307/Physical+Security" },
+];
+
+const notifOrder = [
+  { order: "1. Primary POC", name: "Joe Studley", email: JOE, slack: "joe.studley", mobile: "44 78322 64020", note: "If no response within 20 min, move to Secondary." },
+  { order: "2. Secondary POC", name: "Richard Waldrop", email: RICHARD, slack: "richard.waldrop", mobile: "858 204 6975", note: "If no response within 20 min, move to Tertiary." },
+  { order: "3. Tertiary POC", name: "—", email: "", slack: "", mobile: "", note: "If no response within 20 min, move to Quaternary." },
+  { order: "4. Quaternary POC", name: "Alice Orme", email: ALICE, slack: "alice.orme", mobile: "44 7919 848697", note: "If no response, repeat until live contact made." },
+];
+
+const Badge = ({ label, color, bg }) => (
+  <span style={{ fontSize: 11, fontWeight: 500, padding: "2px 8px", borderRadius: 99, background: bg, color, letterSpacing: 0.3 }}>{label}</span>
+);
+
+const StatusDot = ({ val, label }) => {
+  const color = val === true ? "#3B6D11" : val === false ? "#A32D2D" : "#888780";
+  const bg = val === true ? "#EAF3DE" : val === false ? "#FCEBEB" : "#F1EFE8";
+  const text = val === true ? "Yes" : val === false ? "No" : "?";
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, background: bg, color, borderRadius: 99, padding: "2px 8px", fontWeight: 500 }}>
+      <span style={{ width: 6, height: 6, borderRadius: "50%", background: color, flexShrink: 0 }} />
+      {label && label + ": "}{text}
+    </span>
+  );
+};
+
+const LocalClock = ({ timezone }) => {
+  const [time, setTime] = useState("");
+  const [date, setDate] = useState("");
+  const iana = tzMap[timezone];
+  useEffect(() => {
+    const tick = () => {
+      if (!iana) return;
+      const now = new Date();
+      setTime(now.toLocaleTimeString("en-GB", { timeZone: iana, hour: "2-digit", minute: "2-digit", second: "2-digit" }));
+      setDate(now.toLocaleDateString("en-GB", { timeZone: iana, weekday: "short", day: "numeric", month: "short" }));
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [iana]);
+  if (!iana) return null;
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "14px 20px", background: "var(--color-background-secondary)", borderRadius: "var(--border-radius-lg)", marginBottom: 14, border: "0.5px solid var(--color-border-tertiary)" }}>
+      <div style={{ fontSize: 32, fontWeight: 500, fontVariantNumeric: "tabular-nums", letterSpacing: 1 }}>{time}</div>
+      <div>
+        <div style={{ fontSize: 13, color: "var(--color-text-secondary)" }}>{date}</div>
+        <div style={{ fontSize: 12, color: "var(--color-text-tertiary)" }}>{timezone}</div>
+      </div>
+    </div>
+  );
+};
+
+const SecurityCard = ({ security }) => {
+  const hasOnsite = security.hasOnsite;
+  const border = hasOnsite ? "0.5px solid var(--color-border-tertiary)" : "0.5px solid #F7C1C1";
+  const bg = hasOnsite ? "var(--color-background-secondary)" : "#FCEBEB";
+  const labelColor = hasOnsite ? "var(--color-text-secondary)" : "#791F1F";
+  const textColor = hasOnsite ? "var(--color-text-primary)" : "#791F1F";
+  const subColor = hasOnsite ? "var(--color-text-secondary)" : "#A32D2D";
+  return (
+    <div style={{ border, borderRadius: "var(--border-radius-lg)", padding: "14px 20px", marginBottom: 14, background: bg }}>
+      <div style={{ fontSize: 11, fontWeight: 500, textTransform: "uppercase", letterSpacing: 0.5, color: labelColor, marginBottom: 8 }}>Security coverage</div>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: hasOnsite && security.contacts?.length ? 10 : 0 }}>
+        <span style={{ width: 8, height: 8, borderRadius: "50%", background: hasOnsite ? "#3B6D11" : "#A32D2D", flexShrink: 0 }} />
+        <span style={{ fontSize: 13, fontWeight: 500, color: textColor }}>{hasOnsite ? `Onsite security: ${security.vendor}` : "No onsite security"}</span>
+      </div>
+      {hasOnsite && security.contacts?.map((c, i) => (
+        <div key={i} style={{ paddingTop: 8, borderTop: i === 0 ? (hasOnsite ? "0.5px solid var(--color-border-tertiary)" : "0.5px solid #F09595") : "none", marginTop: i === 0 ? 2 : 0 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+            <span style={{ fontSize: 13, fontWeight: 500, color: textColor }}>{c.name}</span>
+            {c.phone && <span style={{ fontSize: 13, color: textColor }}>{c.phone}</span>}
+          </div>
+          {c.note && <div style={{ fontSize: 12, color: subColor, marginTop: 2 }}>{c.note}</div>}
+        </div>
+      ))}
+    </div>
+  );
+};
+
+const ComposeButtons = ({ office }) => {
+  const subject = office.id;
+  const weEmails = office.contacts.filter(c => c.email && c.role.toLowerCase().includes("we")).map(c => c.email);
+  const primaryEmail = weEmails[0] || "";
+  const standardCC = [VSOC, RICHARD, office.managerEmail].filter(Boolean);
+  return (
+    <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
+      <a href={composeUrl(primaryEmail, subject, standardCC)} target="_blank" rel="noreferrer"
+        style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: "var(--border-radius-md)", background: "#185FA5", color: "#fff", fontSize: 13, fontWeight: 500, textDecoration: "none" }}>
+        ✉ Compose email
+      </a>
+      <a href={composeUrl(weEmails, subject, EHS)} target="_blank" rel="noreferrer"
+        style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: "var(--border-radius-md)", background: "#185FA5", color: "#fff", fontSize: 13, fontWeight: 500, textDecoration: "none" }}>
+        ✉ Compose with EHS
+      </a>
+    </div>
+  );
+};
+
+const ToolBtn = ({ href, label, subtitle, icon, accent }) => {
+  if (!href) return (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8, padding: "24px 16px", borderRadius: "var(--border-radius-lg)", border: "0.5px solid var(--color-border-tertiary)", background: "var(--color-background-secondary)", opacity: 0.4, textAlign: "center" }}>
+      <span style={{ fontSize: 28 }}>{icon}</span>
+      <span style={{ fontSize: 13, fontWeight: 500 }}>{label}</span>
+      <span style={{ fontSize: 11, color: "var(--color-text-tertiary)" }}>No link available</span>
+    </div>
+  );
+  return (
+    <a href={href} target="_blank" rel="noreferrer" style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8, padding: "24px 16px", borderRadius: "var(--border-radius-lg)", border: `1.5px solid ${accent}40`, background: `${accent}08`, textDecoration: "none", textAlign: "center", cursor: "pointer" }}>
+      <span style={{ fontSize: 28 }}>{icon}</span>
+      <span style={{ fontSize: 14, fontWeight: 500, color: accent }}>{label}</span>
+      <span style={{ fontSize: 11, color: "var(--color-text-secondary)" }}>{subtitle}</span>
+    </a>
+  );
+};
+
+export default function App() {
+  const [search, setSearch] = useState("");
+  const [selected, setSelected] = useState(offices[0]);
+  const [activeRegion, setActiveRegion] = useState("All");
+  const [tab, setTab] = useState("office");
+
+  const filtered = offices.filter(o =>
+    (activeRegion === "All" || o.region === activeRegion) &&
+    (o.city.toLowerCase().includes(search.toLowerCase()) || o.country.toLowerCase().includes(search.toLowerCase()))
+  );
+
+  const s = {
+    wrap: { display: "flex", height: "100vh", fontFamily: "var(--font-sans)", fontSize: 14, color: "var(--color-text-primary)", background: "var(--color-background-tertiary)" },
+    sidebar: { width: 220, flexShrink: 0, borderRight: "0.5px solid var(--color-border-tertiary)", display: "flex", flexDirection: "column", background: "var(--color-background-primary)", overflow: "hidden" },
+    sideHeader: { padding: "14px 14px 8px", borderBottom: "0.5px solid var(--color-border-tertiary)" },
+    sideTitle: { fontSize: 13, fontWeight: 500, margin: "0 0 8px" },
+    searchBox: { width: "100%", boxSizing: "border-box", fontSize: 13, padding: "5px 8px", borderRadius: "var(--border-radius-md)", border: "0.5px solid var(--color-border-secondary)", background: "var(--color-background-secondary)", color: "var(--color-text-primary)", outline: "none" },
+    regionBar: { display: "flex", gap: 4, padding: "8px 14px 4px", flexWrap: "wrap" },
+    regionBtn: (r) => ({ fontSize: 11, padding: "2px 8px", borderRadius: 99, border: "0.5px solid", cursor: "pointer", fontWeight: activeRegion === r ? 500 : 400, background: activeRegion === r ? (regionBg[r] || "#E6F1FB") : "transparent", color: activeRegion === r ? (regionColors[r] || "#185FA5") : "var(--color-text-secondary)", borderColor: activeRegion === r ? (regionColors[r] || "#185FA5") : "var(--color-border-tertiary)" }),
+    officeList: { overflowY: "auto", flex: 1 },
+    officeItem: (o) => ({ padding: "8px 14px", cursor: "pointer", borderLeft: selected?.id === o.id ? "2px solid #378ADD" : "2px solid transparent", background: selected?.id === o.id ? "#E6F1FB" : "transparent", display: "flex", alignItems: "center", gap: 8 }),
+    main: { flex: 1, overflowY: "auto", padding: "20px 24px" },
+    tabBar: { display: "flex", gap: 0, borderBottom: "0.5px solid var(--color-border-tertiary)", marginBottom: 20 },
+    tabBtn: (t) => ({ padding: "8px 16px", fontSize: 13, fontWeight: tab === t ? 500 : 400, color: tab === t ? "var(--color-text-primary)" : "var(--color-text-secondary)", background: "none", border: "none", borderBottom: tab === t ? "2px solid #378ADD" : "2px solid transparent", cursor: "pointer" }),
+    card: { background: "var(--color-background-primary)", border: "0.5px solid var(--color-border-tertiary)", borderRadius: "var(--border-radius-lg)", padding: "16px 20px", marginBottom: 14 },
+    label: { fontSize: 11, color: "var(--color-text-secondary)", fontWeight: 500, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 },
+    contactRow: { display: "flex", alignItems: "center", gap: 12, padding: "8px 0" },
+  };
+
+  return (
+    <div style={s.wrap}>
+      <div style={s.sidebar}>
+        <div style={s.sideHeader}>
+          <p style={s.sideTitle}>VSOC Office Hub</p>
+          <input style={s.searchBox} placeholder="Search city or country..." value={search} onChange={e => setSearch(e.target.value)} />
+        </div>
+        <div style={s.regionBar}>
+          {["All", "AMER", "APAC", "EMEA"].map(r => (
+            <button key={r} style={s.regionBtn(r)} onClick={() => setActiveRegion(r)}>{r}</button>
+          ))}
+        </div>
+        <div style={s.officeList}>
+          {filtered.map(o => (
+            <div key={o.id} style={s.officeItem(o)} onClick={() => { setSelected(o); setTab("office"); }}>
+              <span style={{ fontSize: 16 }}>{o.flag}</span>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: selected?.id === o.id ? 500 : 400, color: selected?.id === o.id ? "#185FA5" : "var(--color-text-primary)" }}>{o.city}</div>
+                <div style={{ fontSize: 11, color: "var(--color-text-secondary)" }}>{o.region}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div style={s.main}>
+        {selected && (
+          <>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
+              <span style={{ fontSize: 28 }}>{selected.flag}</span>
+              <div>
+                <h2 style={{ margin: 0, fontSize: 20, fontWeight: 500 }}>{selected.id}</h2>
+                <span style={{ fontSize: 13, color: "var(--color-text-secondary)" }}>{selected.timezone} · {selected.country}</span>
+              </div>
+              <div style={{ marginLeft: "auto" }}>
+                <Badge label={selected.region} color={regionColors[selected.region]} bg={regionBg[selected.region]} />
+              </div>
+            </div>
+            <div style={s.tabBar}>
+              {["office", "contacts", "tools", "global"].map(t => (
+                <button key={t} style={s.tabBtn(t)} onClick={() => setTab(t)}>
+                  {t === "global" ? "Global docs" : t.charAt(0).toUpperCase() + t.slice(1)}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+
+        {tab === "office" && selected && (
+          <>
+            <LocalClock timezone={selected.timezone} />
+            <ComposeButtons office={selected} />
+            {selected.travelBrief && (
+              <div style={{ display: "flex", gap: 10, marginBottom: 14, flexWrap: "wrap" }}>
+                <a href={selected.travelBrief} target="_blank" rel="noreferrer"
+                  style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: "var(--border-radius-md)", background: "#0F6E56", color: "#fff", fontSize: 13, fontWeight: 500, textDecoration: "none" }}>
+                  ✈ Travel brief
+                </a>
+                {selected.elasticSearch && (
+                  <a href={selected.elasticSearch} target="_blank" rel="noreferrer"
+                    style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: "var(--border-radius-md)", background: "#0F6E56", color: "#fff", fontSize: 13, fontWeight: 500, textDecoration: "none" }}>
+                    🔍 Elastic search Montreal
+                  </a>
+                )}
+              </div>
+            )}
+            <div style={s.card}>
+              <div style={s.label}>Address</div>
+              <div style={{ fontSize: 14, marginBottom: 12 }}>{selected.address}</div>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <StatusDot val={selected.accessControl} label="Access control" />
+                <StatusDot val={selected.accessControl === true ? true : false} label="CCTV" />
+                <StatusDot val={selected.groundFloor} label="Ground floor" />
+              </div>
+            </div>
+            <div style={s.card}>
+              <div style={s.label}>PhySec regional manager</div>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <div style={{ fontSize: 14 }}>{selected.physSecManager}</div>
+                <a href={composeUrl(selected.managerEmail, selected.id, RICHARD)} target="_blank" rel="noreferrer"
+                  style={{ fontSize: 12, color: "#185FA5", textDecoration: "none", whiteSpace: "nowrap", padding: "4px 10px", border: "0.5px solid #B5D4F4", borderRadius: "var(--border-radius-md)" }}>
+                  ✉ Email
+                </a>
+              </div>
+            </div>
+            <SecurityCard security={selected.security} />
+            {selected.notes && (
+              <div style={{ ...s.card, background: "#FAEEDA", border: "0.5px solid #EF9F27" }}>
+                <div style={{ ...s.label, color: "#633806" }}>Notes</div>
+                <div style={{ fontSize: 13, color: "#633806" }}>{selected.notes}</div>
+              </div>
+            )}
+          </>
+        )}
+
+        {tab === "contacts" && selected && (
+          <>
+            <ComposeButtons office={selected} />
+
+            <div style={s.card}>
+              <div style={s.label}>Contact list</div>
+              {selected.contacts.length === 0 && (
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "32px 20px", gap: 8, textAlign: "center" }}>
+                  <span style={{ fontSize: 28 }}>🕐</span>
+                  <div style={{ fontSize: 14, fontWeight: 500, color: "var(--color-text-primary)" }}>Contacts pending</div>
+                  <div style={{ fontSize: 12, color: "var(--color-text-secondary)", maxWidth: 260 }}>Contact details for this office haven't been added yet. Check back later or update the spreadsheet.</div>
+                </div>
+              )}
+              {selected.contacts.map((c, i) => (
+                <div key={i} style={{ ...s.contactRow, borderBottom: i < selected.contacts.length - 1 ? "0.5px solid var(--color-border-tertiary)" : "none" }}>
+                  <div style={{ width: 36, height: 36, borderRadius: "50%", background: "#E6F1FB", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 500, color: "#185FA5", flexShrink: 0 }}>
+                    {c.name.replace(/[^a-zA-Z ]/g, "").split(" ").filter(Boolean).map(w => w[0]).slice(0, 2).join("")}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 500, fontSize: 13 }}>{c.name}</div>
+                    <div style={{ fontSize: 12, color: "var(--color-text-secondary)" }}>
+                      ({c.role}){c.phone && c.phone !== "N/A" ? " · " + c.phone : ""}
+                    </div>
+                    {c.note && <div style={{ fontSize: 11, color: "var(--color-text-tertiary)", marginTop: 2 }}>{c.note}</div>}
+                  </div>
+                  {c.email && (
+                    <a href={composeUrl(c.email, selected.id, [VSOC, RICHARD, selected.managerEmail].filter(Boolean))}
+                      target="_blank" rel="noreferrer"
+                      style={{ fontSize: 12, color: "#185FA5", textDecoration: "none", whiteSpace: "nowrap", padding: "4px 10px", border: "0.5px solid #B5D4F4", borderRadius: "var(--border-radius-md)", flexShrink: 0 }}>
+                      ✉ Email
+                    </a>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <div style={{ ...s.card, marginTop: 14 }}>
+              <div style={s.label}>Critical Emergency PhySec Notification Order</div>
+              {notifOrder.map((n, i) => (
+                <div key={i} style={{ padding: "10px 0", borderBottom: i < notifOrder.length - 1 ? "0.5px solid var(--color-border-tertiary)" : "none" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
+                    <Badge label={n.order} color="#185FA5" bg="#E6F1FB" />
+                    <span style={{ fontWeight: 500, fontSize: 13 }}>{n.name}</span>
+                  </div>
+                  {n.email && <div style={{ fontSize: 12, color: "var(--color-text-secondary)", marginBottom: 2 }}>✉ {n.email} · Slack: {n.slack} · {n.mobile}</div>}
+                  <div style={{ fontSize: 12, color: "var(--color-text-tertiary)" }}>{n.note}</div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+
+        {tab === "tools" && selected && (
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <ToolBtn href={jiraUrl(selected.city)} label="Jira" subtitle={`View tickets for ${selected.city}`} icon="🎯" accent="#185FA5" />
+            <ToolBtn href={selected.tools.confluence} label="Confluence" subtitle={`${selected.city} office wiki`} icon="📘" accent="#0F6E56" />
+            <ToolBtn href={selected.tools.gable} label="Gable" subtitle={`${selected.city} floor plan & booking`} icon="🏢" accent="#D85A30" />
+            <ToolBtn href={HELPDESK} label="Help Desk" subtitle="Unity support portal" icon="🎧" accent="#534AB7" />
+          </div>
+        )}
+
+        {tab === "global" && (
+          <>
+            <div style={s.card}>
+              <div style={s.label}>Key documents</div>
+              {globalDocs.map((d, i) => (
+                <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 0", borderBottom: i < globalDocs.length - 1 ? "0.5px solid var(--color-border-tertiary)" : "none" }}>
+                  <span style={{ fontSize: 13 }}>{d.name}</span>
+                  <a href={d.url} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: "#185FA5", textDecoration: "none", whiteSpace: "nowrap", marginLeft: 12 }}>Open ↗</a>
+                </div>
+              ))}
+            </div>
+
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
