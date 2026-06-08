@@ -1,651 +1,160 @@
-import { useState, useEffect } from "react";
-
-const EHS = "ehs@unity3d.com";
-const VSOC = "vsoc@unity3d.com";
-const RICHARD = "richard.waldrop@unity3d.com";
-const JOE = "joe.studley@unity3d.com";
-const ALICE = "alice.orme@unity3d.com";
-const HELPDESK = "https://helpdesk.unity3d.com/support/home";
-
-const composeUrl = (to, subject, cc) => {
-  let url = `https://mail.google.com/mail/?view=cm&to=${encodeURIComponent(Array.isArray(to) ? to.join(",") : to)}&su=${encodeURIComponent(subject)}`;
-  if (cc) url += `&cc=${encodeURIComponent(Array.isArray(cc) ? cc.join(",") : cc)}`;
-  return url;
-};
-
-const jiraUrl = (city) =>
-  `https://jira.unity3d.com/issues/?jql=project%3DGBPSD%20AND%20text~%22${encodeURIComponent(city)}%22%20AND%20status%20IN%20(Open%2C%20Closed%2C%20%22In%20Progress%22%2C%20Canceled%2C%20%22Waiting%20for%20Customer%22%2C%20Monitoring%2C%20%22Awaiting%20Approval%22%2C%20Notification%2C%20Pending)%20ORDER%20BY%20created%20DESC`;
-
-const tzMap = {
-  "EDT (UTC-4)": "America/New_York",
-  "PDT (UTC-7)": "America/Los_Angeles",
-  "CST (UTC+8)": "Asia/Shanghai",
-  "IST (UTC+5:30)": "Asia/Kolkata",
-  "KST (UTC+9)": "Asia/Seoul",
-  "SGT (UTC+8)": "Asia/Singapore",
-  "JST (UTC+9)": "Asia/Tokyo",
-  "BST (UTC+1)": "Europe/London",
-  "CEST (UTC+2)": "Europe/Paris",
-  "EEST (UTC+3)": "Europe/Helsinki",
-  "IDT (UTC+3)": "Asia/Jerusalem",
-};
-
-const offices = [
-  {
-    id: "CAN-Montreal", region: "AMER", flag: "🇨🇦", city: "Montreal", country: "Canada",
-    address: "1751 rue Richardson, suite 3500, Montreal, QC H3K 1G6",
-    timezone: "EDT (UTC-4)", accessControl: true, cctv: null, groundFloor: false,
-    physSecManager: "Joe Studley", managerEmail: JOE,
-    security: { hasOnsite: true, vendor: "Securitas", contacts: [
-      { name: "Securitas Guard", phone: "514 838 7517", note: "Mon 10am PST–Fri 10pm PST" },
-      { name: "Securitas Patrol", phone: "514 938 3433", note: "Fri 8pm PST–Mon 4am PST" },
-      { name: "Raadin Beedasy (Lead)", phone: "", note: "On Slack, M–F 0700–1500 EDT" },
-    ]},
-    contacts: [
-      { role: "Primary WE", name: "Steve Delmas", phone: "(514) 974-8034", email: "steve.delmas@unity3d.com" },
-      { role: "Secondary WE", name: "Marvin Polynice", phone: "(438) 503-9282", email: "marvin.polynice@unity3d.com" },
-      { role: "Alternate WE", name: "Russell Gagnon", phone: "(514) 358-1595", email: "russell.gagnon@unity3d.com" },
-    ],
-    tools: { confluence: "https://confluence.unity3d.com/spaces/HR/pages/500811170/Montreal+Office", gable: "https://app.gable.to/hq/67ec3b33ddb567ed81f2d112" },
-    travelBrief: "https://portal.max-security.com/city/Montreal(Canada)",
-    elasticSearch: "https://portal.max-security.com/elastic?view=list&text=Montreal",
-    notes: ""
-  },
-  {
-    id: "USA-Mountain View", region: "AMER", flag: "🇺🇸", city: "Mountain View", country: "USA",
-    address: "1975 W El Camino Real, Mountain View, CA 94040",
-    timezone: "PDT (UTC-7)", accessControl: false, cctv: false, groundFloor: false,
-    physSecManager: "Joe Studley", managerEmail: JOE,
-    security: { hasOnsite: false },
-    contacts: [
-      { role: "Primary WE", name: "Pending", phone: "Pending" },
-      { role: "Secondary WE", name: "Pending", phone: "Pending" },
-    ],
-    tools: { confluence: "https://confluence.unity3d.com/spaces/HR/pages/500811217/Mountain+View+Office", gable: "https://app.gable.to/hq/68f290111e23c8ec3d9ddf6c" },
-    notes: ""
-  },
-  {
-    id: "USA-Bellevue", region: "AMER", flag: "🇺🇸", city: "Bellevue", country: "USA",
-    address: "10900 NE 8th St, Floor 5, Bellevue, WA 98004",
-    timezone: "PDT (UTC-7)", accessControl: true, cctv: null, groundFloor: false,
-    physSecManager: "Joe Studley", managerEmail: JOE,
-    security: { hasOnsite: false },
-    contacts: [
-      { role: "Primary WE", name: "Russell Gagnon", phone: "(514) 358-1595", email: "russell.gagnon@unity3d.com" },
-      { role: "Alternate", name: "Roni Ivgi (Site Lead) / Yikun Xian (POC)", phone: "N/A" },
-    ],
-    tools: { confluence: null, gable: "https://app.gable.to/hq/69399d7dfaf662b19732c275" },
-    notes: ""
-  },
-  {
-    id: "USA-New York", region: "AMER", flag: "🇺🇸", city: "New York", country: "USA",
-    address: "817 Broadway, Floor 2, New York, NY 10003",
-    timezone: "EDT (UTC-4)", accessControl: false, cctv: true, groundFloor: false,
-    physSecManager: "Joe Studley", managerEmail: JOE,
-    security: { hasOnsite: false },
-    contacts: [
-      { role: "Primary WE", name: "Twaan Johnson", phone: "N/A", email: "twaan.johnson@unity3d.com" },
-      { role: "Secondary WE", name: "Russell Gagnon", phone: "(514) 358-1595", email: "russell.gagnon@unity3d.com" },
-    ],
-    tools: { confluence: "https://confluence.unity3d.com/spaces/HR/pages/500811211/New+York+City+Office", gable: "https://app.gable.to/hq/67f67b3ff50a19d8caf0f008" },
-    notes: ""
-  },
-  {
-    id: "USA-Pittsburgh", region: "AMER", flag: "🇺🇸", city: "Pittsburgh", country: "USA",
-    address: "Pending", timezone: "EDT (UTC-4)", accessControl: false, cctv: false, groundFloor: false,
-    physSecManager: "Joe Studley", managerEmail: JOE,
-    security: { hasOnsite: false },
-    contacts: [],
-    tools: { confluence: "https://confluence.unity3d.com/spaces/HR/pages/500811213/Pittsburgh+Office", gable: null },
-    notes: ""
-  },
-  {
-    id: "USA-San Francisco", region: "AMER", flag: "🇺🇸", city: "San Francisco", country: "USA",
-    address: "116 New Montgomery St, Suite 300, San Francisco, CA 94105",
-    timezone: "PDT (UTC-7)", accessControl: true, cctv: null, groundFloor: false,
-    physSecManager: "Joe Studley", managerEmail: JOE,
-    security: { hasOnsite: true, vendor: "Building Security", contacts: [
-      { name: "Whitney Villasana", phone: "925 995 8915", note: "7am–3pm M–F" },
-    ]},
-    contacts: [
-      { role: "Primary WE", name: "Mike Lee", phone: "N/A", email: "mike.lee@unity3d.com" },
-      { role: "Secondary WE", name: "Russell Gagnon", phone: "(514) 358-1595", email: "russell.gagnon@unity3d.com" },
-    ],
-    tools: { confluence: "https://confluence.unity3d.com/spaces/HR/pages/501426007/Visiting+the+San+Francisco+Office", gable: "https://app.gable.to/hq/67f3eb8de67d62b06cb71a83" },
-    notes: ""
-  },
-  {
-    id: "CHN-Beijing", region: "APAC", flag: "🇨🇳", city: "Beijing", country: "China",
-    address: "Pending", timezone: "CST (UTC+8)", accessControl: false, cctv: false, groundFloor: false,
-    physSecManager: "Joe Studley", managerEmail: JOE,
-    security: { hasOnsite: false },
-    contacts: [],
-    tools: { confluence: "https://confluence.unity3d.com/spaces/HR/pages/500811166/Beijing+Office", gable: "https://app.gable.to/hq/680a373426149832164cf229" },
-    notes: ""
-  },
-  {
-    id: "IND-Bengaluru", region: "APAC", flag: "🇮🇳", city: "Bengaluru", country: "India",
-    address: "Embassy Golf Link, Pebble Beach 4th Floor, Gate 2 Off Intermediate Ring Road, Bangalore 560071",
-    timezone: "IST (UTC+5:30)", accessControl: true, cctv: null, groundFloor: false,
-    physSecManager: "Joe Studley", managerEmail: JOE,
-    security: { hasOnsite: false },
-    contacts: [
-      { role: "Primary WE", name: "Uday Kumar A V", phone: "+91 9482896261", email: "uday.kumar@unity3d.com" },
-      { role: "Secondary WE", name: "Dishani Majumder", phone: "+91 7980243819", email: "dishani.majumder@unity3d.com" },
-      { role: "Alternate WE", name: "JE Chang", phone: "+82 1094573142", email: "je.chang@unity3d.com" },
-    ],
-    tools: { confluence: "https://confluence.unity3d.com/spaces/HR/pages/500811195/Bengaluru+Office", gable: "https://app.gable.to/hq/67f3e2ba58c729ebbf3effc6" },
-    notes: ""
-  },
-  {
-    id: "KOR-Seoul", region: "APAC", flag: "🇰🇷", city: "Seoul", country: "South Korea",
-    address: "21F Gangnam N Tower, 129 Teheran-ro, Gangnam-gu, Seoul 06133",
-    timezone: "KST (UTC+9)", accessControl: true, cctv: null, groundFloor: false,
-    physSecManager: "Joe Studley", managerEmail: JOE,
-    security: { hasOnsite: false },
-    contacts: [
-      { role: "Primary WE (C)", name: "Hyunjeong Lee", phone: "N/A", email: "hyunjeong.lee@unity3d.com" },
-      { role: "Secondary WE", name: "Tina Jang", phone: "+82-10-9489-9821", email: "tina.jang@unity3d.com" },
-      { role: "Alternate WE", name: "JE Chang", phone: "+82 1094573142", email: "je.chang@unity3d.com" },
-    ],
-    tools: { confluence: "https://confluence.unity3d.com/spaces/HR/pages/500811203/Seoul+Office", gable: "https://app.gable.to/hq/67f3ebd05bff751a484200fe" },
-    notes: ""
-  },
-  {
-    id: "SGP-Singapore", region: "APAC", flag: "🇸🇬", city: "Singapore", country: "Singapore",
-    address: "Pending", timezone: "SGT (UTC+8)", accessControl: false, cctv: false, groundFloor: false,
-    physSecManager: "Joe Studley", managerEmail: JOE,
-    security: { hasOnsite: false },
-    contacts: [],
-    tools: { confluence: "https://confluence.unity3d.com/spaces/HR/pages/500811264/Singapore+Office", gable: "https://app.gable.to/hq/6887c3e2f0d551f2092bf3ec" },
-    notes: ""
-  },
-  {
-    id: "JPN-Tokyo", region: "APAC", flag: "🇯🇵", city: "Tokyo", country: "Japan",
-    address: "GINZA SIX 8F, 6-10-1 Ginza, Chuo-ku, Tokyo 104-0061",
-    timezone: "JST (UTC+9)", accessControl: true, cctv: null, groundFloor: false,
-    physSecManager: "Joe Studley", managerEmail: JOE,
-    security: { hasOnsite: false },
-    contacts: [
-      { role: "Primary WE", name: "Satoko Endo", phone: "N/A", email: "satoko.endo@unity3d.com" },
-      { role: "Secondary WE", name: "JE Chang", phone: "+82 1094573142", email: "je.chang@unity3d.com" },
-    ],
-    tools: { confluence: "https://confluence.unity3d.com/spaces/HR/pages/500811199/Tokyo+Office", gable: "https://app.gable.to/hq/67f3f11e47085423d4525546" },
-    notes: "Add Koji Ohno only if issues related to NDA and/or Build Rooms."
-  },
-  {
-    id: "GBR-Brighton", region: "EMEA", flag: "🇬🇧", city: "Brighton", country: "UK",
-    address: "30 Station Street, The Brinell Building, Brighton, BN1 4RB",
-    timezone: "BST (UTC+1)", accessControl: null, cctv: null, groundFloor: null,
-    physSecManager: "Alice Orme", managerEmail: ALICE,
-    security: { hasOnsite: true, vendor: "Atlas Security", contacts: [
-      { name: "Atlas Security", phone: "+44 1273 916888", note: "Kevin Brown: kevin.brown@atlas-security.com" },
-    ]},
-    contacts: [
-      { role: "Primary WE", name: "Mia Clarke", phone: "+44 7456248540", email: "mia.clarke@unity3d.com" },
-      { role: "Secondary WE (C)", name: "Adelle Skilton", phone: "N/A", email: "adelle.skilton@unity3d.com" },
-      { role: "Alternate WE", name: "Karsten Grentoft", phone: "+45 30201228", email: "karsten.grentoft@unity3d.com" },
-    ],
-    tools: { confluence: "https://confluence.unity3d.com/spaces/HR/pages/500811207/Brighton+Office", gable: "https://app.gable.to/hq/67f3deae11b0e1a910b304d5" },
-    notes: ""
-  },
-  {
-    id: "FRA-Compiegne", region: "EMEA", flag: "🇫🇷", city: "Compiegne", country: "France",
-    address: "Pending", timezone: "CEST (UTC+2)", accessControl: false, cctv: false, groundFloor: false,
-    physSecManager: "Alice Orme", managerEmail: ALICE,
-    security: { hasOnsite: false },
-    contacts: [],
-    tools: { confluence: "https://confluence.unity3d.com/spaces/HR/pages/500811177/Compiegne+Office", gable: "https://app.gable.to/hq/67f3e6fe5bff751a4841e5e3" },
-    notes: ""
-  },
-  {
-    id: "DNK-Copenhagen", region: "EMEA", flag: "🇩🇰", city: "Copenhagen", country: "Denmark",
-    address: "Postgarden, Niels Hemmingsens Gade 24, 1153 Copenhagen, Denmark",
-    timezone: "CEST (UTC+2)", accessControl: true, cctv: null, groundFloor: false,
-    physSecManager: "Alice Orme", managerEmail: ALICE,
-    security: { hasOnsite: true, vendor: "Securitas", contacts: [
-      { name: "Securitas 24x7 SOC", phone: "011 454 343 4388", note: "24/7 coverage" },
-    ]},
-    contacts: [
-      { role: "Primary WE", name: "Marija Sojic", phone: "N/A", email: "marija.sojic@unity3d.com" },
-      { role: "Secondary WE", name: "Rasmus Hulkvist Larsen", phone: "+45 26820591", email: "rasmus.larsen@unity3d.com" },
-      { role: "Alternate WE", name: "Karsten Grentoft", phone: "+45 30201228", email: "karsten.grentoft@unity3d.com" },
-    ],
-    tools: { confluence: "https://confluence.unity3d.com/spaces/HR/pages/500811175/Copenhagen+Office", gable: "https://app.gable.to/hq/67f3e3877abd999b3dcff9ff" },
-    notes: ""
-  },
-  {
-    id: "FRA-Grenoble", region: "EMEA", flag: "🇫🇷", city: "Grenoble", country: "France",
-    address: "Pending", timezone: "CEST (UTC+2)", accessControl: false, cctv: false, groundFloor: false,
-    physSecManager: "Alice Orme", managerEmail: ALICE,
-    security: { hasOnsite: false },
-    contacts: [],
-    tools: { confluence: "https://confluence.unity3d.com/spaces/HR/pages/500811186/Grenoble+Office", gable: "https://app.gable.to/hq/67f3e8467abd999b3dd17d25" },
-    notes: ""
-  },
-  {
-    id: "FIN-Helsinki", region: "EMEA", flag: "🇫🇮", city: "Helsinki", country: "Finland",
-    address: "Kaivokatu 6, 6th & 7th floor, 00100, Helsinki, Finland",
-    timezone: "EEST (UTC+3)", accessControl: null, cctv: null, groundFloor: null,
-    physSecManager: "Alice Orme", managerEmail: ALICE,
-    security: { hasOnsite: true, vendor: "Securitas", contacts: [
-      { name: "Securitas", phone: "+358 040 632 4648", note: "vartijat@citycenter.fi" },
-    ]},
-    contacts: [
-      { role: "Primary WE", name: "Kikka Tiinanen", phone: "+358 452544993", email: "kikka.tiinanen@unity3d.com" },
-      { role: "Secondary WE", name: "Justina Rautio", phone: "+358 443282122", email: "justina.rautio@unity3d.com" },
-    ],
-    tools: { confluence: "https://confluence.unity3d.com/spaces/HR/pages/500811266/Helsinki+Office", gable: "https://app.gable.to/hq/67f3e88f58c729ebbf3f1f71" },
-    notes: ""
-  },
-  {
-    id: "FRA-Lille", region: "EMEA", flag: "🇫🇷", city: "Lille", country: "France",
-    address: "2 avenue des Saules, 59160, Lille, France",
-    timezone: "CEST (UTC+2)", accessControl: true, cctv: null, groundFloor: false,
-    physSecManager: "Alice Orme", managerEmail: ALICE,
-    security: { hasOnsite: false },
-    contacts: [
-      { role: "Primary WE", name: "Andreea Frasie", phone: "+33 189202740", email: "andreea.frasie@unity3d.com" },
-      { role: "Secondary WE", name: "Karsten Grentoft", phone: "+45 30201228", email: "karsten.grentoft@unity3d.com" },
-    ],
-    tools: { confluence: "https://confluence.unity3d.com/spaces/HR/pages/500811189/Lille+Office", gable: "https://app.gable.to/hq/67f3ea4511b0e1a910b36813" },
-    notes: ""
-  },
-  {
-    id: "GBR-London", region: "EMEA", flag: "🇬🇧", city: "London", country: "UK",
-    address: "Pending", timezone: "BST (UTC+1)", accessControl: null, cctv: null, groundFloor: null,
-    physSecManager: "Alice Orme", managerEmail: ALICE,
-    security: { hasOnsite: false },
-    contacts: [
-      { role: "Primary WE", name: "Emma Loftus", phone: "Pending", email: "emma.loftus@unity3d.com" },
-      { role: "Alternate WE", name: "Karsten Grentoft", phone: "+45 30201228", email: "karsten.grentoft@unity3d.com" },
-    ],
-    tools: { confluence: "https://confluence.unity3d.com/spaces/HR/pages/500811209/London+Office", gable: null },
-    notes: "Pending details."
-  },
-  {
-    id: "DEU-Munich", region: "EMEA", flag: "🇩🇪", city: "Munich", country: "Germany",
-    address: "Pending", timezone: "CEST (UTC+2)", accessControl: null, cctv: null, groundFloor: null,
-    physSecManager: "Alice Orme", managerEmail: ALICE,
-    security: { hasOnsite: false },
-    contacts: [],
-    tools: { confluence: "https://confluence.unity3d.com/spaces/HR/pages/500811193/Munich+Office", gable: null },
-    notes: ""
-  },
-  {
-    id: "FRA-Paris", region: "EMEA", flag: "🇫🇷", city: "Paris", country: "France",
-    address: "83-85 boulevard Vincent Auriol, 75013, Paris, France",
-    timezone: "CEST (UTC+2)", accessControl: true, cctv: null, groundFloor: false,
-    physSecManager: "Alice Orme", managerEmail: ALICE,
-    security: { hasOnsite: false },
-    contacts: [
-      { role: "Primary WE", name: "Andreea Frasie", phone: "+33 189202740", email: "andreea.frasie@unity3d.com" },
-      { role: "Secondary WE", name: "Karsten Grentoft", phone: "+45 30201228", email: "karsten.grentoft@unity3d.com" },
-    ],
-    tools: { confluence: "https://confluence.unity3d.com/spaces/HR/pages/500811191/Paris+Office", gable: "https://app.gable.to/hq/67f3eb085bff751a4841ff98" },
-    notes: ""
-  },
-  {
-    id: "SWE-Stockholm", region: "EMEA", flag: "🇸🇪", city: "Stockholm", country: "Sweden",
-    address: "Pending", timezone: "CEST (UTC+2)", accessControl: null, cctv: null, groundFloor: null,
-    physSecManager: "Alice Orme", managerEmail: ALICE,
-    security: { hasOnsite: false },
-    contacts: [],
-    tools: { confluence: "https://confluence.unity3d.com/spaces/HR/pages/500811205/Stockholm+Office", gable: "https://app.gable.to/hq/67f3f1cde67d62b06cb74a22" },
-    notes: "Pending details"
-  },
-  {
-    id: "GBR-Stratford-upon-Avon", region: "EMEA", flag: "🇬🇧", city: "Stratford-upon-Avon", country: "UK",
-    address: "Pending", timezone: "BST (UTC+1)", accessControl: null, cctv: null, groundFloor: null,
-    physSecManager: "Alice Orme", managerEmail: ALICE,
-    security: { hasOnsite: false },
-    contacts: [],
-    tools: { confluence: "https://confluence.unity3d.com/spaces/HR/pages/500803490/Stratford-Upon-Avon+Office", gable: "https://app.gable.to/hq/67f3f06947085423d4525385" },
-    notes: "Pending details"
-  },
-  {
-    id: "ISR-Tel Aviv", region: "EMEA", flag: "🇮🇱", city: "Tel Aviv", country: "Israel",
-    address: "Pending", timezone: "IDT (UTC+3)", accessControl: null, cctv: null, groundFloor: null,
-    physSecManager: "Alice Orme", managerEmail: ALICE,
-    security: { hasOnsite: false },
-    contacts: [],
-    tools: { confluence: "https://confluence.unity3d.com/spaces/HR/pages/500811197/Tel+Aviv+Office", gable: "https://app.gable.to/hq/67f3e9ea3423430964ad055a" },
-    notes: "Pending details"
-  },
-  {
-    id: "LTU-Vilnius", region: "EMEA", flag: "🇱🇹", city: "Vilnius", country: "Lithuania",
-    address: "Pending", timezone: "EEST (UTC+3)", accessControl: null, cctv: null, groundFloor: null,
-    physSecManager: "Alice Orme", managerEmail: ALICE,
-    security: { hasOnsite: false },
-    contacts: [],
-    tools: { confluence: "https://confluence.unity3d.com/spaces/HR/pages/500811201/Vilnius+Office", gable: "https://app.gable.to/hq/67f3f1cde67d62b06cb74a22" },
-    notes: "Pending details"
-  },
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>VSOC Office Hub</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+<style>*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;height:100vh;overflow:hidden}::-webkit-scrollbar{width:4px}::-webkit-scrollbar-thumb{background:#ccc;border-radius:4px}</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState,useEffect}=React;
+const EHS="ehs@unity3d.com",VSOC="vsoc@unity3d.com",RICHARD="richard.waldrop@unity3d.com",JOE="joe.studley@unity3d.com",JOE_SLACK="U03NECGBFTK",ALICE="alice.orme@unity3d.com",ALICE_SLACK="U06SDNU591U",HELPDESK="https://helpdesk.unity3d.com/support/home";
+const jiraUrl=city=>`https://jira.unity3d.com/issues/?jql=project%3DGBPSD%20AND%20text~%22${encodeURIComponent(city)}%22%20AND%20status%20IN%20(Open%2C%20Closed%2C%20%22In%20Progress%22%2C%20Canceled%2C%20%22Waiting%20for%20Customer%22%2C%20Monitoring%2C%20%22Awaiting%20Approval%22%2C%20Notification%2C%20Pending)%20ORDER%20BY%20created%20DESC`;
+const tzMap={"EDT (UTC-4)":"America/New_York","PDT (UTC-7)":"America/Los_Angeles","CST (UTC+8)":"Asia/Shanghai","IST (UTC+5:30)":"Asia/Kolkata","KST (UTC+9)":"Asia/Seoul","SGT (UTC+8)":"Asia/Singapore","JST (UTC+9)":"Asia/Tokyo","BST (UTC+1)":"Europe/London","CEST (UTC+2)":"Europe/Paris","EEST (UTC+3)":"Europe/Helsinki","IDT (UTC+3)":"Asia/Jerusalem","GST (UTC+4)":"Asia/Dubai"};
+const lightTheme={bg:"#F0F4F8",sidebar:"#1B2A4A",accent:"#2563EB",accentLight:"#EFF6FF",accentBorder:"#BFDBFE",green:"#059669",greenLight:"#ECFDF5",red:"#DC2626",redLight:"#FEF2F2",redBorder:"#FECACA",card:"#FFFFFF",cardBorder:"#E2E8F0",text:"#0F172A",textSec:"#64748B",textTer:"#94A3B8",amber:"#D97706",amberLight:"#FFFBEB",amberBorder:"#FDE68A",purple:"#7C3AED",purpleLight:"#F5F3FF",purpleBorder:"#DDD6FE"};
+const darkTheme={bg:"#0F172A",sidebar:"#0B1628",accent:"#3B82F6",accentLight:"#1E3A5F",accentBorder:"#1E40AF",green:"#10B981",greenLight:"#064E3B",red:"#EF4444",redLight:"#450A0A",redBorder:"#7F1D1D",card:"#1E293B",cardBorder:"#334155",text:"#F1F5F9",textSec:"#F1F5F9",textTer:"#CBD5E1",amber:"#F59E0B",amberLight:"#431407",amberBorder:"#78350F",purple:"#A78BFA",purpleLight:"#2E1065",purpleBorder:"#4C1D95"};
+const regionColors={AMER:"#2563EB",APAC:"#059669",EMEA:"#DC2626"};
+const regionBg={AMER:"#EFF6FF",APAC:"#ECFDF5",EMEA:"#FEF2F2"};
+const officeLinks={"CAN-Montreal":{travel:"https://portal.max-security.com/city/Montreal(Canada)",elastic:"https://portal.max-security.com/elastic?view=list&text=Montreal"},"USA-Mountain View":{travel:null,elastic:"https://portal.max-security.com/elastic?view=list&text=Mountain+View"},"USA-Bellevue":{travel:null,elastic:"https://portal.max-security.com/elastic?view=list&text=Bellevue"},"USA-New York":{travel:"https://portal.max-security.com/city/New%20York%20City(USA)",elastic:"https://portal.max-security.com/elastic?view=list&text=New+York"},"USA-Canonsburg":{travel:null,elastic:null},"USA-Pittsburgh":{travel:null,elastic:"https://portal.max-security.com/elastic?view=list&text=Pittsburgh"},"USA-San Francisco":{travel:"https://portal.max-security.com/city/San%20Francisco(USA)",elastic:"https://portal.max-security.com/elastic?view=list&text=San+Francisco"},"CHN-Beijing":{travel:"https://portal.max-security.com/city/Beijing(China)",elastic:"https://portal.max-security.com/elastic?view=list&text=Beijing"},"IND-Bengaluru":{travel:null,elastic:"https://portal.max-security.com/elastic?view=list&text=Bengaluru"},"KOR-Seoul":{travel:null,elastic:"https://portal.max-security.com/elastic?view=list&text=South+Korea"},"SGP-Singapore":{travel:"https://portal.max-security.com/city/Singapore(Singapore)",elastic:"https://portal.max-security.com/elastic?view=list&text=Singapore"},"JPN-Tokyo":{travel:"https://portal.max-security.com/city/Tokyo(Japan)",elastic:"https://portal.max-security.com/elastic?view=list&text=Tokyo"},"GBR-Brighton":{travel:null,elastic:"https://portal.max-security.com/elastic?view=list&text=Brighton"},"FRA-Compiegne":{travel:null,elastic:"https://portal.max-security.com/elastic?view=list&text=Compiegne"},"DNK-Copenhagen":{travel:"https://portal.max-security.com/city/Copenhagen(Denmark)",elastic:"https://portal.max-security.com/elastic?view=list&text=Copenhagen"},"FRA-Grenoble":{travel:null,elastic:"https://portal.max-security.com/elastic?view=list&text=Grenoble"},"FIN-Helsinki":{travel:"https://portal.max-security.com/city/Helsinki(Finland)",elastic:"https://portal.max-security.com/elastic?view=list&text=Helsinki"},"FRA-Lille":{travel:"https://portal.max-security.com/city/Lille(France)",elastic:"https://portal.max-security.com/elastic?view=list&text=Lille"},"GBR-London":{travel:"https://portal.max-security.com/city/London(UK)",elastic:"https://portal.max-security.com/elastic?view=list&text=London"},"DEU-Munich":{travel:"https://portal.max-security.com/city/Munich(Germany)",elastic:"https://portal.max-security.com/elastic?view=list&text=Munich"},"FRA-Paris":{travel:"https://portal.max-security.com/city/Paris(France)",elastic:"https://portal.max-security.com/elastic?view=list&text=Paris"},"SWE-Stockholm":{travel:"https://portal.max-security.com/city/Stockholm(Sweden)",elastic:"https://portal.max-security.com/elastic?view=list&text=Stockholm"},"GBR-Stratford-upon-Avon":{travel:null,elastic:"https://portal.max-security.com/elastic?view=list&text=Stratford-upon-Avon"},"ISR-Tel Aviv":{travel:"https://portal.max-security.com/city/Tel%20Aviv(Israel)",elastic:"https://portal.max-security.com/elastic?view=list&text=Tel+Aviv"},"LTU-Vilnius":{travel:"https://portal.max-security.com/city/Vilnius(Lithuania)",elastic:"https://portal.max-security.com/elastic?view=list&text=Vilnius"},"UAE-Abu Dhabi":{travel:"https://portal.max-security.com/city/Abu%20Dhabi(UAE)",elastic:"https://portal.max-security.com/elastic?view=list&text=Abu+Dhabi"}};
+const offices=[
+{id:"CAN-Montreal",region:"AMER",flag:"🇨🇦",city:"Montreal",country:"Canada",address:"1751 rue Richardson, suite 3500, Montreal, QC H3K 1G6",timezone:"EDT (UTC-4)",accessControl:true,groundFloor:false,physSecManager:"Joe Studley",managerEmail:JOE,security:{hasOnsite:true,vendor:"Securitas",contacts:[{name:"Securitas Guard",phone:"514 838 7517",note:"Mon 10am PST–Fri 10pm PST"},{name:"Securitas Patrol",phone:"514 938 3433",note:"Fri 8pm PST–Mon 4am PST"},{name:"Raadin Beedasy (Lead)",phone:"",note:"On Slack, M–F 0700–1500 EDT",slack:"U09GYECQ3AP",email:"raadin.beedasy@unity3d.com"}]},contacts:[{role:"Primary WE",name:"Steve Delmas",phone:"(514) 974-8034",email:"steve.delmas@unity3d.com",slack:"U043F68TKUY"},{role:"Secondary WE",name:"Marvin Polynice",phone:"(438) 503-9282",email:"marvin.polynice@unity3d.com",slack:"U01JQ6S4B8C"},{role:"Alternate WE",name:"Russell Gagnon",phone:"(514) 358-1595",email:"russell.gagnon@unity3d.com",slack:"W018WNRT24A"}],tools:{confluence:"https://confluence.unity3d.com/spaces/HR/pages/500811170/Montreal+Office",gable:"https://app.gable.to/hq/67ec3b33ddb567ed81f2d112"},notes:""},
+{id:"USA-Mountain View",region:"AMER",flag:"🇺🇸",city:"Mountain View",country:"USA",address:"1975 W El Camino Real, Mountain View, CA 94040",timezone:"PDT (UTC-7)",accessControl:false,groundFloor:false,physSecManager:"Joe Studley",managerEmail:JOE,security:{hasOnsite:false},contacts:[{role:"Primary WE",name:"Pending",phone:"Pending"},{role:"Secondary WE",name:"Pending",phone:"Pending"}],tools:{confluence:"https://confluence.unity3d.com/spaces/HR/pages/500811217/Mountain+View+Office",gable:"https://app.gable.to/hq/68f290111e23c8ec3d9ddf6c"},notes:""},
+{id:"USA-Bellevue",region:"AMER",flag:"🇺🇸",city:"Bellevue",country:"USA",address:"10900 NE 8th St, Floor 5, Bellevue, WA 98004",timezone:"PDT (UTC-7)",accessControl:true,groundFloor:false,physSecManager:"Joe Studley",managerEmail:JOE,security:{hasOnsite:false},contacts:[{role:"Primary WE",name:"Russell Gagnon",phone:"(514) 358-1595",email:"russell.gagnon@unity3d.com",slack:"W018WNRT24A"},{role:"Alternate",name:"Roni Ivgi / Yikun Xian",phone:"N/A"}],tools:{confluence:null,gable:"https://app.gable.to/hq/69399d7dfaf662b19732c275"},notes:""},
+{id:"USA-New York",region:"AMER",flag:"🇺🇸",city:"New York",country:"USA",address:"817 Broadway, Floor 2, New York, NY 10003",timezone:"EDT (UTC-4)",accessControl:false,groundFloor:false,physSecManager:"Joe Studley",managerEmail:JOE,security:{hasOnsite:false},contacts:[{role:"Primary WE",name:"Twaan Johnson",phone:"N/A",email:"twaan.johnson@unity3d.com",slack:"U08TYMQSDRV"},{role:"Secondary WE",name:"Russell Gagnon",phone:"(514) 358-1595",email:"russell.gagnon@unity3d.com",slack:"W018WNRT24A"}],tools:{confluence:"https://confluence.unity3d.com/spaces/HR/pages/500811211/New+York+City+Office",gable:"https://app.gable.to/hq/67f67b3ff50a19d8caf0f008"},notes:""},
+{id:"USA-Canonsburg",region:"AMER",flag:"🇺🇸",city:"Canonsburg",country:"USA",address:"1900 Main Street, Canonsburg, PA 15317",timezone:"EDT (UTC-4)",accessControl:false,groundFloor:false,physSecManager:"Joe Studley",managerEmail:JOE,security:{hasOnsite:false},contacts:[{role:"Primary WE",name:"Russell Gagnon",phone:"(514) 358-1595",email:"russell.gagnon@unity3d.com",slack:"W018WNRT24A"}],tools:{confluence:null,gable:null},notes:""},
+{id:"USA-Pittsburgh",region:"AMER",flag:"🇺🇸",city:"Pittsburgh",country:"USA",address:"Pending",timezone:"EDT (UTC-4)",accessControl:false,groundFloor:false,physSecManager:"Joe Studley",managerEmail:JOE,security:{hasOnsite:false},contacts:[],tools:{confluence:"https://confluence.unity3d.com/spaces/HR/pages/500811213/Pittsburgh+Office",gable:null},notes:""},
+{id:"USA-San Francisco",region:"AMER",flag:"🇺🇸",city:"San Francisco",country:"USA",address:"116 New Montgomery St, Suite 300, San Francisco, CA 94105",timezone:"PDT (UTC-7)",accessControl:true,groundFloor:false,physSecManager:"Joe Studley",managerEmail:JOE,security:{hasOnsite:true,vendor:"Building Security",contacts:[{name:"Whitney Villasana",phone:"925 995 8915",note:"7am–3pm M–F",slack:"U05U6SXGK3Q",email:"whitney.villasana@unity3d.com"}]},contacts:[{role:"Primary WE",name:"Mike Lee",phone:"N/A",email:"mike.lee@unity3d.com",slack:"U084F1X817S"},{role:"Secondary WE",name:"Russell Gagnon",phone:"(514) 358-1595",email:"russell.gagnon@unity3d.com",slack:"W018WNRT24A"}],tools:{confluence:"https://confluence.unity3d.com/spaces/HR/pages/501426007/Visiting+the+San+Francisco+Office",gable:"https://app.gable.to/hq/67f3eb8de67d62b06cb71a83"},notes:""},
+{id:"CHN-Beijing",region:"APAC",flag:"🇨🇳",city:"Beijing",country:"China",address:"Pending",timezone:"CST (UTC+8)",accessControl:false,groundFloor:false,physSecManager:"Joe Studley",managerEmail:JOE,security:{hasOnsite:false},contacts:[],tools:{confluence:"https://confluence.unity3d.com/spaces/HR/pages/500811166/Beijing+Office",gable:"https://app.gable.to/hq/680a373426149832164cf229"},notes:""},
+{id:"IND-Bengaluru",region:"APAC",flag:"🇮🇳",city:"Bengaluru",country:"India",address:"Embassy Golf Link, Pebble Beach 4th Floor, Gate 2 Off Intermediate Ring Road, Bangalore 560071",timezone:"IST (UTC+5:30)",accessControl:true,groundFloor:false,physSecManager:"Joe Studley",managerEmail:JOE,security:{hasOnsite:false},contacts:[{role:"Primary WE",name:"Uday Kumar A V",phone:"+91 9482896261",email:"uday.kumar@unity3d.com",slack:"U0492U3FFN2"},{role:"Secondary WE",name:"Dishani Majumder",phone:"+91 7980243819",email:"dishani.majumder@unity3d.com",slack:"U08MJGFHVHD"},{role:"Alternate WE",name:"JE Chang",phone:"+82 1094573142",email:"je.chang@unity3d.com",slack:"U03R76ERN3W"}],tools:{confluence:"https://confluence.unity3d.com/spaces/HR/pages/500811195/Bengaluru+Office",gable:"https://app.gable.to/hq/67f3e2ba58c729ebbf3effc6"},notes:""},
+{id:"KOR-Seoul",region:"APAC",flag:"🇰🇷",city:"Seoul",country:"South Korea",address:"21F Gangnam N Tower, 129 Teheran-ro, Gangnam-gu, Seoul 06133",timezone:"KST (UTC+9)",accessControl:true,groundFloor:false,physSecManager:"Joe Studley",managerEmail:JOE,security:{hasOnsite:false},contacts:[{role:"Primary WE (C)",name:"Hyunjeong Lee",phone:"N/A",email:"hyunjeong.lee@unity3d.com"},{role:"Secondary WE",name:"Tina Jang",phone:"+82-10-9489-9821",email:"tina.jang@unity3d.com",slack:"W0192U2AYUC"},{role:"Alternate WE",name:"JE Chang",phone:"+82 1094573142",email:"je.chang@unity3d.com",slack:"U03R76ERN3W"}],tools:{confluence:"https://confluence.unity3d.com/spaces/HR/pages/500811203/Seoul+Office",gable:"https://app.gable.to/hq/67f3ebd05bff751a484200fe"},notes:""},
+{id:"SGP-Singapore",region:"APAC",flag:"🇸🇬",city:"Singapore",country:"Singapore",address:"Pending",timezone:"SGT (UTC+8)",accessControl:false,groundFloor:false,physSecManager:"Joe Studley",managerEmail:JOE,security:{hasOnsite:false},contacts:[],tools:{confluence:"https://confluence.unity3d.com/spaces/HR/pages/500811264/Singapore+Office",gable:"https://app.gable.to/hq/6887c3e2f0d551f2092bf3ec"},notes:""},
+{id:"JPN-Tokyo",region:"APAC",flag:"🇯🇵",city:"Tokyo",country:"Japan",address:"GINZA SIX 8F, 6-10-1 Ginza, Chuo-ku, Tokyo 104-0061",timezone:"JST (UTC+9)",accessControl:true,groundFloor:false,physSecManager:"Joe Studley",managerEmail:JOE,security:{hasOnsite:false},contacts:[{role:"Primary WE",name:"Satoko Endo",phone:"N/A",email:"satoko.endo@unity3d.com",slack:"U0A0CNKJE7K"},{role:"Secondary WE",name:"JE Chang",phone:"+82 1094573142",email:"je.chang@unity3d.com",slack:"U03R76ERN3W"}],tools:{confluence:"https://confluence.unity3d.com/spaces/HR/pages/500811199/Tokyo+Office",gable:"https://app.gable.to/hq/67f3f11e47085423d4525546"},notes:"Add Koji Ohno only if issues related to NDA and/or Build Rooms."},
+{id:"GBR-Brighton",region:"EMEA",flag:"🇬🇧",city:"Brighton",country:"UK",address:"30 Station Street, The Brinell Building, Brighton, BN1 4RB",timezone:"BST (UTC+1)",accessControl:null,groundFloor:null,physSecManager:"Alice Orme",managerEmail:ALICE,security:{hasOnsite:true,vendor:"Atlas Security",contacts:[{name:"Atlas Security",phone:"+44 1273 916888",note:"Kevin Brown: kevin.brown@atlas-security.com"}]},contacts:[{role:"Primary WE",name:"Mia Clarke",phone:"+44 7456248540",email:"mia.clarke@unity3d.com",slack:"W018PUVQZML"},{role:"Secondary WE (C)",name:"Adelle Skilton",phone:"N/A",email:"adelle.skilton@unity3d.com"},{role:"Alternate WE",name:"Karsten Grentoft",phone:"+45 30201228",email:"karsten.grentoft@unity3d.com",slack:"W018FSTJ8VD"}],tools:{confluence:"https://confluence.unity3d.com/spaces/HR/pages/500811207/Brighton+Office",gable:"https://app.gable.to/hq/67f3deae11b0e1a910b304d5"},notes:""},
+{id:"FRA-Compiegne",region:"EMEA",flag:"🇫🇷",city:"Compiegne",country:"France",address:"Pending",timezone:"CEST (UTC+2)",accessControl:false,groundFloor:false,physSecManager:"Alice Orme",managerEmail:ALICE,security:{hasOnsite:false},contacts:[],tools:{confluence:"https://confluence.unity3d.com/spaces/HR/pages/500811177/Compiegne+Office",gable:"https://app.gable.to/hq/67f3e6fe5bff751a4841e5e3"},notes:""},
+{id:"DNK-Copenhagen",region:"EMEA",flag:"🇩🇰",city:"Copenhagen",country:"Denmark",address:"Postgarden, Niels Hemmingsens Gade 24, 1153 Copenhagen, Denmark",timezone:"CEST (UTC+2)",accessControl:true,groundFloor:false,physSecManager:"Alice Orme",managerEmail:ALICE,security:{hasOnsite:true,vendor:"Securitas",contacts:[{name:"Securitas 24x7 SOC",phone:"011 454 343 4388",note:"24/7 coverage"}]},contacts:[{role:"Primary WE",name:"Marija Sojic",phone:"N/A",email:"marija.sojic@unity3d.com",slack:"W018FPMSWJK"},{role:"Secondary WE",name:"Rasmus Hulkvist Larsen",phone:"+45 26820591",email:"rasmus.larsen@unity3d.com",slack:"W0192VBP57W"},{role:"Alternate WE",name:"Karsten Grentoft",phone:"+45 30201228",email:"karsten.grentoft@unity3d.com",slack:"W018FSTJ8VD"}],tools:{confluence:"https://confluence.unity3d.com/spaces/HR/pages/500811175/Copenhagen+Office",gable:"https://app.gable.to/hq/67f3e3877abd999b3dcff9ff"},notes:""},
+{id:"FRA-Grenoble",region:"EMEA",flag:"🇫🇷",city:"Grenoble",country:"France",address:"Pending",timezone:"CEST (UTC+2)",accessControl:false,groundFloor:false,physSecManager:"Alice Orme",managerEmail:ALICE,security:{hasOnsite:false},contacts:[],tools:{confluence:"https://confluence.unity3d.com/spaces/HR/pages/500811186/Grenoble+Office",gable:"https://app.gable.to/hq/67f3e8467abd999b3dd17d25"},notes:""},
+{id:"FIN-Helsinki",region:"EMEA",flag:"🇫🇮",city:"Helsinki",country:"Finland",address:"Kaivokatu 6, 6th & 7th floor, 00100, Helsinki, Finland",timezone:"EEST (UTC+3)",accessControl:null,groundFloor:null,physSecManager:"Alice Orme",managerEmail:ALICE,security:{hasOnsite:true,vendor:"Securitas",contacts:[{name:"Securitas",phone:"+358 040 632 4648",note:"vartijat@citycenter.fi"}]},contacts:[{role:"Primary WE",name:"Kikka Tiinanen",phone:"+358 452544993",email:"kikka.tiinanen@unity3d.com",slack:"U02U54FJX2R"},{role:"Secondary WE",name:"Justina Rautio",phone:"+358 443282122",email:"justina.rautio@unity3d.com",slack:"W018G2U7SNT"}],tools:{confluence:"https://confluence.unity3d.com/spaces/HR/pages/500811266/Helsinki+Office",gable:"https://app.gable.to/hq/67f3e88f58c729ebbf3f1f71"},notes:""},
+{id:"FRA-Lille",region:"EMEA",flag:"🇫🇷",city:"Lille",country:"France",address:"2 avenue des Saules, 59160, Lille, France",timezone:"CEST (UTC+2)",accessControl:true,groundFloor:false,physSecManager:"Alice Orme",managerEmail:ALICE,security:{hasOnsite:false},contacts:[{role:"Primary WE",name:"Andreea Frasie",phone:"+33 189202740",email:"andreea.frasie@unity3d.com",slack:"W018G02SX6K"},{role:"Secondary WE",name:"Karsten Grentoft",phone:"+45 30201228",email:"karsten.grentoft@unity3d.com",slack:"W018FSTJ8VD"}],tools:{confluence:"https://confluence.unity3d.com/spaces/HR/pages/500811189/Lille+Office",gable:"https://app.gable.to/hq/67f3ea4511b0e1a910b36813"},notes:""},
+{id:"GBR-London",region:"EMEA",flag:"🇬🇧",city:"London",country:"UK",address:"Pending",timezone:"BST (UTC+1)",accessControl:null,groundFloor:null,physSecManager:"Alice Orme",managerEmail:ALICE,security:{hasOnsite:false},contacts:[{role:"Primary WE",name:"Emma Loftus",phone:"Pending",email:"emma.loftus@unity3d.com",slack:"U035G0UV8D9"},{role:"Alternate WE",name:"Karsten Grentoft",phone:"+45 30201228",email:"karsten.grentoft@unity3d.com",slack:"W018FSTJ8VD"}],tools:{confluence:"https://confluence.unity3d.com/spaces/HR/pages/500811209/London+Office",gable:null},notes:"Pending details."},
+{id:"DEU-Munich",region:"EMEA",flag:"🇩🇪",city:"Munich",country:"Germany",address:"Pending",timezone:"CEST (UTC+2)",accessControl:null,groundFloor:null,physSecManager:"Alice Orme",managerEmail:ALICE,security:{hasOnsite:false},contacts:[],tools:{confluence:"https://confluence.unity3d.com/spaces/HR/pages/500811193/Munich+Office",gable:null},notes:""},
+{id:"FRA-Paris",region:"EMEA",flag:"🇫🇷",city:"Paris",country:"France",address:"83-85 boulevard Vincent Auriol, 75013, Paris, France",timezone:"CEST (UTC+2)",accessControl:true,groundFloor:false,physSecManager:"Alice Orme",managerEmail:ALICE,security:{hasOnsite:false},contacts:[{role:"Primary WE",name:"Andreea Frasie",phone:"+33 189202740",email:"andreea.frasie@unity3d.com",slack:"W018G02SX6K"},{role:"Secondary WE",name:"Karsten Grentoft",phone:"+45 30201228",email:"karsten.grentoft@unity3d.com",slack:"W018FSTJ8VD"}],tools:{confluence:"https://confluence.unity3d.com/spaces/HR/pages/500811191/Paris+Office",gable:"https://app.gable.to/hq/67f3eb085bff751a4841ff98"},notes:""},
+{id:"SWE-Stockholm",region:"EMEA",flag:"🇸🇪",city:"Stockholm",country:"Sweden",address:"Unity Technologies, c/o Godsmottagning, Åsögatan 106A, 118 29, Stockholm, Sweden",timezone:"CEST (UTC+2)",accessControl:null,groundFloor:null,physSecManager:"Alice Orme",managerEmail:ALICE,security:{hasOnsite:true,vendor:"Securitas",contacts:[{name:"Securitas",phone:"46 01047057069",note:"kundtjanst@securitasdirect.se"}]},contacts:[{role:"Primary WE",name:"Justina Rautio",phone:"+358 443282122",email:"justina.rautio@unity3d.com",slack:"W018G2U7SNT"}],tools:{confluence:"https://confluence.unity3d.com/spaces/HR/pages/500811205/Stockholm+Office",gable:"https://app.gable.to/hq/67f3f1cde67d62b06cb74a22"},notes:""},
+{id:"GBR-Stratford-upon-Avon",region:"EMEA",flag:"🇬🇧",city:"Stratford-upon-Avon",country:"UK",address:"6-7a Grove Business Park, Atherstone on Stour, Stratford-upon-Avon, Warwickshire, CV37 8DX",timezone:"BST (UTC+1)",accessControl:null,groundFloor:null,physSecManager:"Alice Orme",managerEmail:ALICE,security:{hasOnsite:false},contacts:[{role:"Primary WE (C)",name:"Clare White",phone:"N/A",email:"clare.white@unity3d.com",slack:"U093V5LGZ32"},{role:"Secondary WE",name:"Emma Loftus",phone:"N/A",email:"emma.loftus@unity3d.com",slack:"U035G0UV8D9"},{role:"Alternate WE",name:"Karsten Grentoft",phone:"+45 30201228",email:"karsten.grentoft@unity3d.com",slack:"W018FSTJ8VD"}],tools:{confluence:"https://confluence.unity3d.com/spaces/HR/pages/500803490/Stratford-Upon-Avon+Office",gable:"https://app.gable.to/hq/67f3f06947085423d4525385"},notes:""},
+{id:"ISR-Tel Aviv",region:"EMEA",flag:"🇮🇱",city:"Tel Aviv",country:"Israel",address:"Menachem Begin St 121 Azrieli Sarona Tower, Tel Aviv 688218, Israel",timezone:"IDT (UTC+3)",accessControl:null,groundFloor:null,physSecManager:"Alice Orme",managerEmail:ALICE,security:{hasOnsite:false},contacts:[{role:"Primary WE",name:"Gon Sela",phone:"+972 506982131",email:"gon.sela@unity3d.com",slack:"U0499DSU882"},{role:"Primary WE",name:"Ariel Oved",phone:"+972 506982131",email:"ariel.oved@unity3d.com",slack:"U049Z5L6XME"},{role:"Secondary WE",name:"Justina Rautio",phone:"+358 443282122",email:"justina.rautio@unity3d.com",slack:"W018G2U7SNT"}],tools:{confluence:"https://confluence.unity3d.com/spaces/HR/pages/500811197/Tel+Aviv+Office",gable:"https://app.gable.to/hq/67f3e9ea3423430964ad055a"},notes:""},
+{id:"LTU-Vilnius",region:"EMEA",flag:"🇱🇹",city:"Vilnius",country:"Lithuania",address:"Unity Technologies Lt, UAB, Konstitucijos ave 21A, Quadrum East, 4th floor, LT-08130, Vilnius, Lithuania",timezone:"EEST (UTC+3)",accessControl:null,groundFloor:null,physSecManager:"Alice Orme",managerEmail:ALICE,security:{hasOnsite:true,vendor:"Eurocash1 UAB",contacts:[{name:"Eurocash1 UAB",phone:"+370 687 20881"}]},contacts:[{role:"Primary WE",name:"Vilius Strikauskas",phone:"N/A",email:"vilius.strikauskas@unity3d.com",slack:"U0AEST93M1T"},{role:"Secondary WE",name:"Justina Rautio",phone:"+358 443282122",email:"justina.rautio@unity3d.com",slack:"W018G2U7SNT"}],tools:{confluence:"https://confluence.unity3d.com/spaces/HR/pages/500811201/Vilnius+Office",gable:"https://app.gable.to/hq/67f3f1cde67d62b06cb74a22"},notes:"East Quadrum: Ina Račkauskaitė east@quadrum.lt"},
+{id:"UAE-Abu Dhabi",region:"EMEA",flag:"🇦🇪",city:"Abu Dhabi",country:"UAE",address:"Khalidiyah Street - Yas Island - YS2 - Abu Dhabi - United Arab Emirates",timezone:"GST (UTC+4)",accessControl:null,groundFloor:null,physSecManager:"Alice Orme",managerEmail:ALICE,security:{hasOnsite:false},contacts:[{role:"Primary WE",name:"Katia Serbina",phone:"N/A",email:"katia.serbina@unity3d.com",slack:"U098413ES13"}],tools:{confluence:null,gable:null},notes:""},
 ];
+const globalDocs=[{name:"VSOC Operations Document",url:"https://docs.google.com/document/d/1wROd18-jVzr0zu_Kv3Wxn2Y_U08faNaFBwj8X2UVlRs/edit?usp=sharing"},{name:"Crisis Management Plan V1 VSOC Version",url:"https://docs.google.com/document/d/1Z4nbO0bpb113shunKQ28vuUqzwHyaqXfmvYjnBODgLc/edit?tab=t.0"},{name:"Temporary SOPs",url:"https://docs.google.com/document/d/1p4Pi1AVXF5wzc9meg6O0bQ63Ju6gAUr2Iz7CmLnpjzQ/edit?tab=t.0"},{name:"Physical Security Confluence Page",url:"https://confluence.unity3d.com/spaces/HR/pages/500814307/Physical+Security"}];
+const notifOrder=[{order:"1. Primary POC",name:"Joe Studley",email:JOE,slackId:"U03NECGBFTK",mobile:"44 78322 64020",note:"If no response within 20 min, move to Secondary."},{order:"2. Secondary POC",name:"Richard Waldrop",email:RICHARD,slackId:"U035YPJ90U9",mobile:"858 204 6975",note:"If no response within 20 min, move to Tertiary."},{order:"3. Tertiary POC",name:"—",email:"",slackId:"",mobile:"",note:"If no response within 20 min, move to Quaternary."},{order:"4. Quaternary POC",name:"Alice Orme",email:ALICE,slackId:"U06SDNU591U",mobile:"44 7919 848697",note:"If no response, repeat until live contact made."}];
 
-const regionColors = { AMER: "#378ADD", APAC: "#1D9E75", EMEA: "#D85A30" };
-const regionBg = { AMER: "#E6F1FB", APAC: "#E1F5EE", EMEA: "#FAECE7" };
+const isOpen=tz=>{const iana=tzMap[tz];if(!iana)return false;const now=new Date();const day=now.toLocaleDateString("en-US",{timeZone:iana,weekday:"short"});const hour=parseInt(now.toLocaleTimeString("en-US",{timeZone:iana,hour:"numeric",hour12:false}));return day!=="Sat"&&day!=="Sun"&&hour>=8&&hour<17;};
+const Badge=({label,color,bg})=><span style={{fontSize:11,fontWeight:600,padding:"2px 10px",borderRadius:99,background:bg,color,letterSpacing:0.4}}>{label}</span>;
+const StatusDot=({val,label,th})=>{const color=val===true?th.green:val===false?th.red:"#94A3B8";const bg=val===true?th.greenLight:val===false?th.redLight:"#F8FAFC";const border=val===true?"#BBF7D0":val===false?th.redBorder:"#E2E8F0";return <span style={{display:"inline-flex",alignItems:"center",gap:5,fontSize:12,background:bg,color,borderRadius:99,padding:"3px 10px",fontWeight:500,border:`1px solid ${border}`}}><span style={{width:6,height:6,borderRadius:"50%",background:color,flexShrink:0}}/>{label&&label+": "}{val===true?"Yes":val===false?"No":"?"}</span>;};
+const LocalClock=({timezone})=>{const [time,setTime]=useState("");const [date,setDate]=useState("");const iana=tzMap[timezone];useEffect(()=>{const tick=()=>{if(!iana)return;const now=new Date();setTime(now.toLocaleTimeString("en-GB",{timeZone:iana,hour:"2-digit",minute:"2-digit",second:"2-digit"}));setDate(now.toLocaleDateString("en-GB",{timeZone:iana,weekday:"short",day:"numeric",month:"short"}));};tick();const id=setInterval(tick,1000);return()=>clearInterval(id);},[iana]);if(!iana)return null;return <div style={{display:"flex",alignItems:"center",gap:16,padding:"16px 20px",background:"linear-gradient(135deg,#1B2A4A 0%,#2563EB 100%)",borderRadius:12,marginBottom:16,color:"#fff"}}><div style={{fontSize:36,fontWeight:700,fontVariantNumeric:"tabular-nums",letterSpacing:2}}>{time}</div><div><div style={{fontSize:13,opacity:0.9}}>{date}</div><div style={{fontSize:11,opacity:0.6,marginTop:2}}>{timezone}</div></div></div>;};
+const SecurityCard=({security,officeId,th,dark})=>{const h=security.hasOnsite;const titleColor=dark?"#F1F5F9":h?th.green:th.red;const vendorColor=dark?"#F1F5F9":h?"#065F46":"#991B1B";const contactColor=dark?"#F1F5F9":"#065F46";const noteColor=dark?"#A7F3D0":"#047857";return <div style={{border:`1px solid ${h?"#BBF7D0":th.redBorder}`,borderRadius:12,padding:"14px 20px",marginBottom:14,background:h?th.greenLight:th.redLight}}><div style={{fontSize:11,fontWeight:600,textTransform:"uppercase",letterSpacing:0.6,color:titleColor,marginBottom:8}}>Security coverage</div><div style={{display:"flex",alignItems:"center",gap:8,marginBottom:h&&security.contacts?.length?10:0}}><span style={{width:9,height:9,borderRadius:"50%",background:h?th.green:th.red,flexShrink:0,boxShadow:`0 0 0 3px ${h?"#BBF7D0":"#FECACA"}`}}/><span style={{fontSize:13,fontWeight:600,color:vendorColor}}>{h?`Onsite security: ${security.vendor}`:"No onsite security"}</span></div>{h&&security.contacts?.map((c,i)=><div key={i} style={{paddingTop:8,borderTop:i===0?"1px solid #BBF7D0":"none",marginTop:i===0?2:0}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}><span style={{fontSize:13,fontWeight:500,color:contactColor}}>{c.name}{c.phone?" · "+c.phone:""}</span><div style={{display:"flex",gap:6}}>{c.slack&&<a href={"https://slack.com/app_redirect?channel="+c.slack} target="_blank" rel="noreferrer" style={{fontSize:12,color:th.purple,textDecoration:"none",padding:"3px 8px",border:`1px solid ${th.purpleBorder}`,borderRadius:6,background:th.purpleLight,fontWeight:500}}>💬 Slack</a>}{c.email&&<a href={"https://mail.google.com/mail/?view=cm&to="+c.email+"&su="+encodeURIComponent(officeId)} target="_blank" rel="noreferrer" style={{fontSize:12,color:th.accent,textDecoration:"none",padding:"3px 8px",border:`1px solid ${th.accentBorder}`,borderRadius:6,background:th.accentLight,fontWeight:500}}>✉ Email</a>}</div></div>{c.note&&<div style={{fontSize:12,color:noteColor,marginTop:2}}>{c.note}</div>}</div>)}</div>;};
+const ToolBtn=({href,label,subtitle,icon,accent,lightBg})=>{if(!href)return <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:8,padding:"24px 16px",borderRadius:12,border:"1px solid #E2E8F0",background:"#F8FAFC",opacity:0.5,textAlign:"center"}}><span style={{fontSize:28}}>{icon}</span><span style={{fontSize:13,fontWeight:500,color:"#64748B"}}>{label}</span><span style={{fontSize:11,color:"#94A3B8"}}>No link available</span></div>;return <a href={href} target="_blank" rel="noreferrer" style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:8,padding:"24px 16px",borderRadius:12,border:`1.5px solid ${accent}30`,background:lightBg||`${accent}08`,textDecoration:"none",textAlign:"center"}}><span style={{fontSize:28}}>{icon}</span><span style={{fontSize:14,fontWeight:600,color:accent}}>{label}</span><span style={{fontSize:11,color:"#64748B"}}>{subtitle}</span></a>;};
 
-const globalDocs = [
-  { name: "VSOC Operations Document", url: "https://docs.google.com/document/d/1wROd18-jVzr0zu_Kv3Wxn2Y_U08faNaFBwj8X2UVlRs/edit?usp=sharing" },
-  { name: "Crisis Management Plan V1 VSOC Version", url: "https://docs.google.com/document/d/1Z4nbO0bpb113shunKQ28vuUqzwHyaqXfmvYjnBODgLc/edit?tab=t.0" },
-  { name: "Temporary SOPs", url: "https://docs.google.com/document/d/1p4Pi1AVXF5wzc9meg6O0bQ63Ju6gAUr2Iz7CmLnpjzQ/edit?tab=t.0" },
-  { name: "Physical Security Confluence Page", url: "https://confluence.unity3d.com/spaces/HR/pages/500814307/Physical+Security" },
-];
-
-const notifOrder = [
-  { order: "1. Primary POC", name: "Joe Studley", email: JOE, slack: "joe.studley", mobile: "44 78322 64020", note: "If no response within 20 min, move to Secondary." },
-  { order: "2. Secondary POC", name: "Richard Waldrop", email: RICHARD, slack: "richard.waldrop", mobile: "858 204 6975", note: "If no response within 20 min, move to Tertiary." },
-  { order: "3. Tertiary POC", name: "—", email: "", slack: "", mobile: "", note: "If no response within 20 min, move to Quaternary." },
-  { order: "4. Quaternary POC", name: "Alice Orme", email: ALICE, slack: "alice.orme", mobile: "44 7919 848697", note: "If no response, repeat until live contact made." },
-];
-
-const Badge = ({ label, color, bg }) => (
-  <span style={{ fontSize: 11, fontWeight: 500, padding: "2px 8px", borderRadius: 99, background: bg, color, letterSpacing: 0.3 }}>{label}</span>
-);
-
-const StatusDot = ({ val, label }) => {
-  const color = val === true ? "#3B6D11" : val === false ? "#A32D2D" : "#888780";
-  const bg = val === true ? "#EAF3DE" : val === false ? "#FCEBEB" : "#F1EFE8";
-  const text = val === true ? "Yes" : val === false ? "No" : "?";
-  return (
-    <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, background: bg, color, borderRadius: 99, padding: "2px 8px", fontWeight: 500 }}>
-      <span style={{ width: 6, height: 6, borderRadius: "50%", background: color, flexShrink: 0 }} />
-      {label && label + ": "}{text}
-    </span>
-  );
-};
-
-const LocalClock = ({ timezone }) => {
-  const [time, setTime] = useState("");
-  const [date, setDate] = useState("");
-  const iana = tzMap[timezone];
-  useEffect(() => {
-    const tick = () => {
-      if (!iana) return;
-      const now = new Date();
-      setTime(now.toLocaleTimeString("en-GB", { timeZone: iana, hour: "2-digit", minute: "2-digit", second: "2-digit" }));
-      setDate(now.toLocaleDateString("en-GB", { timeZone: iana, weekday: "short", day: "numeric", month: "short" }));
-    };
-    tick();
-    const id = setInterval(tick, 1000);
-    return () => clearInterval(id);
-  }, [iana]);
-  if (!iana) return null;
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "14px 20px", background: "var(--color-background-secondary)", borderRadius: "var(--border-radius-lg)", marginBottom: 14, border: "0.5px solid var(--color-border-tertiary)" }}>
-      <div style={{ fontSize: 32, fontWeight: 500, fontVariantNumeric: "tabular-nums", letterSpacing: 1 }}>{time}</div>
-      <div>
-        <div style={{ fontSize: 13, color: "var(--color-text-secondary)" }}>{date}</div>
-        <div style={{ fontSize: 12, color: "var(--color-text-tertiary)" }}>{timezone}</div>
+function App(){
+  const [search,setSearch]=useState("");
+  const [selected,setSelected]=useState(offices[0]);
+  const [activeRegion,setActiveRegion]=useState("All");
+  const [tab,setTab]=useState("office");
+  const [dark,setDark]=useState(false);
+  const th=dark?darkTheme:lightTheme;
+  const filtered=offices.filter(o=>(activeRegion==="All"||o.region===activeRegion)&&(o.city.toLowerCase().includes(search.toLowerCase())||o.country.toLowerCase().includes(search.toLowerCase())));
+  const links=officeLinks[selected?.id]||{};
+  const card={background:th.card,border:`1px solid ${th.cardBorder}`,borderRadius:12,padding:"16px 20px",marginBottom:14,boxShadow:"0 1px 3px rgba(0,0,0,0.04)"};
+  const lbl={fontSize:11,color:th.textTer,fontWeight:600,textTransform:"uppercase",letterSpacing:0.6,marginBottom:8};
+  const btnBlue={display:"inline-flex",alignItems:"center",gap:6,padding:"8px 16px",borderRadius:8,background:th.accent,color:"#fff",fontSize:13,fontWeight:500,textDecoration:"none"};
+  const btnGreen={display:"inline-flex",alignItems:"center",gap:6,padding:"8px 16px",borderRadius:8,background:th.green,color:"#fff",fontSize:13,fontWeight:500,textDecoration:"none"};
+  return <div style={{display:"flex",height:"100vh",fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",fontSize:14,color:th.text,background:th.bg}}>
+    <div style={{width:230,flexShrink:0,display:"flex",flexDirection:"column",background:th.sidebar,overflow:"hidden"}}>
+      <div style={{padding:"20px 16px 12px",borderBottom:"1px solid rgba(255,255,255,0.08)"}}>
+        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
+          <div style={{width:32,height:32,borderRadius:8,background:"linear-gradient(135deg,#2563EB,#7C3AED)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16}}>🌐</div>
+          <div style={{flex:1}}><div style={{fontSize:13,fontWeight:700,color:"#fff",letterSpacing:0.3}}>VSOC Office Hub</div></div>
+          <button onClick={()=>setDark(d=>!d)} style={{background:"rgba(255,255,255,0.1)",border:"none",borderRadius:6,cursor:"pointer",fontSize:14,padding:"4px 6px",color:"#fff"}}>{dark?"☀️":"🌙"}</button>
+        </div>
+        <input style={{width:"100%",boxSizing:"border-box",fontSize:12,padding:"7px 10px",borderRadius:8,border:"1px solid rgba(255,255,255,0.12)",background:"rgba(255,255,255,0.07)",color:"#fff",outline:"none"}} placeholder="Search city or country..." value={search} onChange={e=>setSearch(e.target.value)}/>
+      </div>
+      <div style={{display:"flex",gap:4,padding:"10px 12px 6px",flexWrap:"wrap"}}>
+        {["All","AMER","APAC","EMEA"].map(r=><button key={r} onClick={()=>setActiveRegion(r)} style={{fontSize:11,padding:"3px 10px",borderRadius:99,border:"none",cursor:"pointer",fontWeight:activeRegion===r?600:400,background:activeRegion===r?regionColors[r]:"rgba(255,255,255,0.08)",color:activeRegion===r?"#fff":"rgba(255,255,255,0.5)"}}>{r}</button>)}
+      </div>
+      <div style={{display:"flex",gap:12,padding:"4px 14px 8px"}}>
+        <div style={{display:"flex",alignItems:"center",gap:4}}><span style={{width:7,height:7,borderRadius:"50%",background:"#34D399",display:"inline-block"}}/><span style={{fontSize:10,color:"rgba(255,255,255,0.4)"}}>Open</span></div>
+        <div style={{display:"flex",alignItems:"center",gap:4}}><span style={{width:7,height:7,borderRadius:"50%",background:"#F87171",display:"inline-block"}}/><span style={{fontSize:10,color:"rgba(255,255,255,0.4)"}}>Closed</span></div>
+      </div>
+      <div style={{overflowY:"auto",flex:1,padding:"4px 0"}}>
+        {filtered.map(o=><div key={o.id} onClick={()=>{setSelected(o);setTab("office");}} style={{padding:"9px 16px",cursor:"pointer",borderLeft:selected?.id===o.id?"3px solid #2563EB":"3px solid transparent",background:selected?.id===o.id?"rgba(37,99,235,0.15)":"transparent",display:"flex",alignItems:"center",gap:10}}>
+          <span style={{fontSize:18}}>{o.flag}</span>
+          <div style={{flex:1}}><div style={{fontSize:13,fontWeight:selected?.id===o.id?600:400,color:selected?.id===o.id?"#93C5FD":"rgba(255,255,255,0.85)"}}>{o.city}</div><div style={{fontSize:10,color:"rgba(255,255,255,0.35)",marginTop:1}}>{o.country}</div></div>
+          <div style={{width:8,height:8,borderRadius:"50%",flexShrink:0,background:isOpen(o.timezone)?"#34D399":"#F87171",boxShadow:isOpen(o.timezone)?"0 0 0 2px rgba(52,211,153,0.3)":"0 0 0 2px rgba(248,113,113,0.3)"}}/>
+        </div>)}
       </div>
     </div>
-  );
-};
-
-const SecurityCard = ({ security }) => {
-  const hasOnsite = security.hasOnsite;
-  const border = hasOnsite ? "0.5px solid var(--color-border-tertiary)" : "0.5px solid #F7C1C1";
-  const bg = hasOnsite ? "var(--color-background-secondary)" : "#FCEBEB";
-  const labelColor = hasOnsite ? "var(--color-text-secondary)" : "#791F1F";
-  const textColor = hasOnsite ? "var(--color-text-primary)" : "#791F1F";
-  const subColor = hasOnsite ? "var(--color-text-secondary)" : "#A32D2D";
-  return (
-    <div style={{ border, borderRadius: "var(--border-radius-lg)", padding: "14px 20px", marginBottom: 14, background: bg }}>
-      <div style={{ fontSize: 11, fontWeight: 500, textTransform: "uppercase", letterSpacing: 0.5, color: labelColor, marginBottom: 8 }}>Security coverage</div>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: hasOnsite && security.contacts?.length ? 10 : 0 }}>
-        <span style={{ width: 8, height: 8, borderRadius: "50%", background: hasOnsite ? "#3B6D11" : "#A32D2D", flexShrink: 0 }} />
-        <span style={{ fontSize: 13, fontWeight: 500, color: textColor }}>{hasOnsite ? `Onsite security: ${security.vendor}` : "No onsite security"}</span>
-      </div>
-      {hasOnsite && security.contacts?.map((c, i) => (
-        <div key={i} style={{ paddingTop: 8, borderTop: i === 0 ? (hasOnsite ? "0.5px solid var(--color-border-tertiary)" : "0.5px solid #F09595") : "none", marginTop: i === 0 ? 2 : 0 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-            <span style={{ fontSize: 13, fontWeight: 500, color: textColor }}>{c.name}</span>
-            {c.phone && <span style={{ fontSize: 13, color: textColor }}>{c.phone}</span>}
-          </div>
-          {c.note && <div style={{ fontSize: 12, color: subColor, marginTop: 2 }}>{c.note}</div>}
+    <div style={{flex:1,overflowY:"auto",padding:"24px 28px"}}>
+      {selected&&<>
+        <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:20,padding:"16px 20px",background:th.card,borderRadius:14,border:`1px solid ${th.cardBorder}`,boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
+          <span style={{fontSize:36}}>{selected.flag}</span>
+          <div style={{flex:1}}><h2 style={{margin:"0 0 3px",fontSize:22,fontWeight:700,color:th.text}}>{selected.id}</h2><span style={{fontSize:13,color:th.textSec}}>{selected.timezone} · {selected.country}</span></div>
+          <Badge label={selected.region} color={regionColors[selected.region]} bg={regionBg[selected.region]}/>
         </div>
-      ))}
-    </div>
-  );
-};
-
-const ComposeButtons = ({ office }) => {
-  const subject = office.id;
-  const weEmails = office.contacts.filter(c => c.email && c.role.toLowerCase().includes("we")).map(c => c.email);
-  const primaryEmail = weEmails[0] || "";
-  const standardCC = [VSOC, RICHARD, office.managerEmail].filter(Boolean);
-  return (
-    <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
-      <a href={composeUrl(primaryEmail, subject, standardCC)} target="_blank" rel="noreferrer"
-        style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: "var(--border-radius-md)", background: "#185FA5", color: "#fff", fontSize: 13, fontWeight: 500, textDecoration: "none" }}>
-        ✉ Compose email
-      </a>
-      <a href={composeUrl(weEmails, subject, EHS)} target="_blank" rel="noreferrer"
-        style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: "var(--border-radius-md)", background: "#185FA5", color: "#fff", fontSize: 13, fontWeight: 500, textDecoration: "none" }}>
-        ✉ Compose with EHS
-      </a>
-    </div>
-  );
-};
-
-const ToolBtn = ({ href, label, subtitle, icon, accent }) => {
-  if (!href) return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8, padding: "24px 16px", borderRadius: "var(--border-radius-lg)", border: "0.5px solid var(--color-border-tertiary)", background: "var(--color-background-secondary)", opacity: 0.4, textAlign: "center" }}>
-      <span style={{ fontSize: 28 }}>{icon}</span>
-      <span style={{ fontSize: 13, fontWeight: 500 }}>{label}</span>
-      <span style={{ fontSize: 11, color: "var(--color-text-tertiary)" }}>No link available</span>
-    </div>
-  );
-  return (
-    <a href={href} target="_blank" rel="noreferrer" style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8, padding: "24px 16px", borderRadius: "var(--border-radius-lg)", border: `1.5px solid ${accent}40`, background: `${accent}08`, textDecoration: "none", textAlign: "center", cursor: "pointer" }}>
-      <span style={{ fontSize: 28 }}>{icon}</span>
-      <span style={{ fontSize: 14, fontWeight: 500, color: accent }}>{label}</span>
-      <span style={{ fontSize: 11, color: "var(--color-text-secondary)" }}>{subtitle}</span>
-    </a>
-  );
-};
-
-export default function App() {
-  const [search, setSearch] = useState("");
-  const [selected, setSelected] = useState(offices[0]);
-  const [activeRegion, setActiveRegion] = useState("All");
-  const [tab, setTab] = useState("office");
-
-  const filtered = offices.filter(o =>
-    (activeRegion === "All" || o.region === activeRegion) &&
-    (o.city.toLowerCase().includes(search.toLowerCase()) || o.country.toLowerCase().includes(search.toLowerCase()))
-  );
-
-  const s = {
-    wrap: { display: "flex", height: "100vh", fontFamily: "var(--font-sans)", fontSize: 14, color: "var(--color-text-primary)", background: "var(--color-background-tertiary)" },
-    sidebar: { width: 220, flexShrink: 0, borderRight: "0.5px solid var(--color-border-tertiary)", display: "flex", flexDirection: "column", background: "var(--color-background-primary)", overflow: "hidden" },
-    sideHeader: { padding: "14px 14px 8px", borderBottom: "0.5px solid var(--color-border-tertiary)" },
-    sideTitle: { fontSize: 13, fontWeight: 500, margin: "0 0 8px" },
-    searchBox: { width: "100%", boxSizing: "border-box", fontSize: 13, padding: "5px 8px", borderRadius: "var(--border-radius-md)", border: "0.5px solid var(--color-border-secondary)", background: "var(--color-background-secondary)", color: "var(--color-text-primary)", outline: "none" },
-    regionBar: { display: "flex", gap: 4, padding: "8px 14px 4px", flexWrap: "wrap" },
-    regionBtn: (r) => ({ fontSize: 11, padding: "2px 8px", borderRadius: 99, border: "0.5px solid", cursor: "pointer", fontWeight: activeRegion === r ? 500 : 400, background: activeRegion === r ? (regionBg[r] || "#E6F1FB") : "transparent", color: activeRegion === r ? (regionColors[r] || "#185FA5") : "var(--color-text-secondary)", borderColor: activeRegion === r ? (regionColors[r] || "#185FA5") : "var(--color-border-tertiary)" }),
-    officeList: { overflowY: "auto", flex: 1 },
-    officeItem: (o) => ({ padding: "8px 14px", cursor: "pointer", borderLeft: selected?.id === o.id ? "2px solid #378ADD" : "2px solid transparent", background: selected?.id === o.id ? "#E6F1FB" : "transparent", display: "flex", alignItems: "center", gap: 8 }),
-    main: { flex: 1, overflowY: "auto", padding: "20px 24px" },
-    tabBar: { display: "flex", gap: 0, borderBottom: "0.5px solid var(--color-border-tertiary)", marginBottom: 20 },
-    tabBtn: (t) => ({ padding: "8px 16px", fontSize: 13, fontWeight: tab === t ? 500 : 400, color: tab === t ? "var(--color-text-primary)" : "var(--color-text-secondary)", background: "none", border: "none", borderBottom: tab === t ? "2px solid #378ADD" : "2px solid transparent", cursor: "pointer" }),
-    card: { background: "var(--color-background-primary)", border: "0.5px solid var(--color-border-tertiary)", borderRadius: "var(--border-radius-lg)", padding: "16px 20px", marginBottom: 14 },
-    label: { fontSize: 11, color: "var(--color-text-secondary)", fontWeight: 500, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 },
-    contactRow: { display: "flex", alignItems: "center", gap: 12, padding: "8px 0" },
-  };
-
-  return (
-    <div style={s.wrap}>
-      <div style={s.sidebar}>
-        <div style={s.sideHeader}>
-          <p style={s.sideTitle}>VSOC Office Hub</p>
-          <input style={s.searchBox} placeholder="Search city or country..." value={search} onChange={e => setSearch(e.target.value)} />
+        <div style={{display:"flex",gap:2,marginBottom:20,background:th.card,borderRadius:10,padding:4,border:`1px solid ${th.cardBorder}`,width:"fit-content",boxShadow:"0 1px 3px rgba(0,0,0,0.04)"}}>
+          {["office","contacts","tools","global"].map(t2=><button key={t2} onClick={()=>setTab(t2)} style={{padding:"7px 18px",fontSize:13,fontWeight:tab===t2?600:400,color:tab===t2?"#fff":th.textSec,background:tab===t2?th.accent:"transparent",border:"none",borderRadius:7,cursor:"pointer"}}>{t2==="global"?"Global docs":t2.charAt(0).toUpperCase()+t2.slice(1)}</button>)}
         </div>
-        <div style={s.regionBar}>
-          {["All", "AMER", "APAC", "EMEA"].map(r => (
-            <button key={r} style={s.regionBtn(r)} onClick={() => setActiveRegion(r)}>{r}</button>
-          ))}
+      </>}
+      {tab==="office"&&selected&&<>
+        <LocalClock timezone={selected.timezone}/>
+        {selected.contacts.filter(c=>c.email).length>0&&(()=>{const to=selected.contacts.filter(c=>c.email).map(c=>c.email).join(",");const cc=[RICHARD,VSOC,selected.managerEmail].filter(Boolean).join(",");const ehsCC=[EHS,RICHARD,VSOC,selected.managerEmail].filter(Boolean).join(",");return <div style={{display:"flex",gap:10,marginBottom:16,flexWrap:"wrap"}}><a href={"https://mail.google.com/mail/?view=cm&to="+to+"&cc="+cc+"&su="+encodeURIComponent(selected.id)} target="_blank" rel="noreferrer" style={btnBlue}>✉ Compose email</a><a href={"https://mail.google.com/mail/?view=cm&to="+to+"&cc="+ehsCC+"&su="+encodeURIComponent(selected.id)} target="_blank" rel="noreferrer" style={btnBlue}>✉ Compose with EHS</a></div>;})()}
+        {(links.travel||links.elastic)&&<div style={{display:"flex",gap:10,marginBottom:16,flexWrap:"wrap"}}>{links.travel&&<a href={links.travel} target="_blank" rel="noreferrer" style={btnGreen}>✈ Travel brief</a>}{links.elastic&&<a href={links.elastic} target="_blank" rel="noreferrer" style={btnGreen}>🔍 Elastic Search {selected.city}</a>}</div>}
+        <div style={card}><div style={lbl}>Address</div><div style={{fontSize:14,marginBottom:12}}>{selected.address}</div><div style={{display:"flex",gap:8,flexWrap:"wrap"}}><StatusDot val={selected.accessControl} label="Access control" th={th}/><StatusDot val={selected.accessControl===true} label="CCTV" th={th}/><StatusDot val={selected.groundFloor} label="Ground floor" th={th}/></div></div>
+        <div style={card}><div style={lbl}>PhySec regional manager</div><div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}><div style={{fontSize:14,fontWeight:500}}>{selected.physSecManager}</div><div style={{display:"flex",gap:6}}><a href={"https://slack.com/app_redirect?channel="+(selected.managerEmail===JOE?JOE_SLACK:ALICE_SLACK)} target="_blank" rel="noreferrer" style={{fontSize:12,color:th.purple,textDecoration:"none",padding:"4px 10px",border:`1px solid ${th.purpleBorder}`,borderRadius:7,background:th.purpleLight,fontWeight:500}}>💬 Slack</a><a href={"https://mail.google.com/mail/?view=cm&to="+selected.managerEmail+"&cc="+RICHARD+"&su="+encodeURIComponent(selected.id)} target="_blank" rel="noreferrer" style={{fontSize:12,color:th.accent,textDecoration:"none",padding:"4px 12px",border:`1px solid ${th.accentBorder}`,borderRadius:7,background:th.accentLight}}>✉ Email</a></div></div></div>
+        <SecurityCard security={selected.security} officeId={selected.id} th={th} dark={dark}/>
+        {selected.notes&&<div style={{...card,background:th.amberLight,border:`1px solid ${th.amberBorder}`}}><div style={{...lbl,color:th.amber}}>Notes</div><div style={{fontSize:13,color:dark?"#FCD34D":"#92400E"}}>{selected.notes}</div></div>}
+      </>}
+      {tab==="contacts"&&selected&&<>
+        <div style={card}>
+          <div style={lbl}>Contact list</div>
+          {selected.contacts.length===0&&<div style={{display:"flex",flexDirection:"column",alignItems:"center",padding:"32px 20px",gap:8,textAlign:"center"}}><span style={{fontSize:32}}>🕐</span><div style={{fontSize:14,fontWeight:600}}>Contacts pending</div><div style={{fontSize:12,color:th.textSec,maxWidth:260}}>Contact details haven't been added yet.</div></div>}
+          {selected.contacts.map((c,i)=><div key={i} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 0",borderBottom:i<selected.contacts.length-1?`1px solid ${th.cardBorder}`:"none"}}>
+            <div style={{width:38,height:38,borderRadius:"50%",background:"linear-gradient(135deg,#2563EB,#7C3AED)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:700,color:"#fff",flexShrink:0}}>{c.name.replace(/[^a-zA-Z ]/g,"").split(" ").filter(Boolean).map(w=>w[0]).slice(0,2).join("")}</div>
+            <div style={{flex:1,minWidth:0}}><div style={{fontWeight:600,fontSize:13}}>{c.name}</div><div style={{fontSize:12,color:th.textSec}}>({c.role}){c.phone&&c.phone!=="N/A"?" · "+c.phone:""}</div>{c.note&&<div style={{fontSize:11,color:th.textTer,marginTop:2}}>{c.note}</div>}</div>
+            <div style={{display:"flex",gap:6,flexShrink:0}}>{c.slack&&<a href={"https://slack.com/app_redirect?channel="+c.slack} target="_blank" rel="noreferrer" style={{fontSize:12,color:th.purple,textDecoration:"none",padding:"4px 10px",border:`1px solid ${th.purpleBorder}`,borderRadius:7,background:th.purpleLight,fontWeight:500}}>💬 Slack</a>}{c.email&&<a href={"https://mail.google.com/mail/?view=cm&to="+c.email+"&cc="+[RICHARD,selected.managerEmail,VSOC].filter(Boolean).join(",")+"&su="+encodeURIComponent(selected.id)} target="_blank" rel="noreferrer" style={{fontSize:12,color:th.accent,textDecoration:"none",padding:"4px 10px",border:`1px solid ${th.accentBorder}`,borderRadius:7,background:th.accentLight,fontWeight:500}}>✉ Email</a>}</div>
+          </div>)}
         </div>
-        <div style={s.officeList}>
-          {filtered.map(o => (
-            <div key={o.id} style={s.officeItem(o)} onClick={() => { setSelected(o); setTab("office"); }}>
-              <span style={{ fontSize: 16 }}>{o.flag}</span>
-              <div>
-                <div style={{ fontSize: 13, fontWeight: selected?.id === o.id ? 500 : 400, color: selected?.id === o.id ? "#185FA5" : "var(--color-text-primary)" }}>{o.city}</div>
-                <div style={{ fontSize: 11, color: "var(--color-text-secondary)" }}>{o.region}</div>
-              </div>
+        <div style={{...card,border:"1px solid #FED7AA",background:dark?"#431407":"#FFF7ED"}}>
+          <div style={{...lbl,color:dark?"#F1F5F9":"#C2410C"}}>Critical Emergency PhySec Notification Order</div>
+          {notifOrder.map((n,i)=><div key={i} style={{padding:"10px 0",borderBottom:i<notifOrder.length-1?"1px solid #FED7AA":"none"}}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:4}}>
+              <div style={{display:"flex",alignItems:"center",gap:10}}><Badge label={n.order} color={th.accent} bg={th.accentLight}/><span style={{fontWeight:600,fontSize:13,color:dark?"#F1F5F9":th.text}}>{n.name}</span></div>
+              {n.email&&<div style={{display:"flex",gap:6}}><a href={"https://slack.com/app_redirect?channel="+n.slackId} target="_blank" rel="noreferrer" style={{fontSize:12,color:th.purple,textDecoration:"none",padding:"3px 8px",border:`1px solid ${th.purpleBorder}`,borderRadius:6,background:th.purpleLight,fontWeight:500}}>💬 Slack</a><a href={"https://mail.google.com/mail/?view=cm&to="+n.email+"&su="+encodeURIComponent("URGENT: ")} target="_blank" rel="noreferrer" style={{fontSize:12,color:th.accent,textDecoration:"none",padding:"3px 8px",border:`1px solid ${th.accentBorder}`,borderRadius:6,background:th.accentLight,fontWeight:500}}>✉ Email</a></div>}
             </div>
-          ))}
+            {n.email&&<div style={{fontSize:12,color:dark?"#F1F5F9":"#9A3412",marginBottom:2}}>{n.email} · {n.mobile}</div>}
+            <div style={{fontSize:12,color:dark?"#FCD34D":"#C2410C"}}>{n.note}</div>
+          </div>)}
         </div>
-      </div>
-
-      <div style={s.main}>
-        {selected && (
-          <>
-            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
-              <span style={{ fontSize: 28 }}>{selected.flag}</span>
-              <div>
-                <h2 style={{ margin: 0, fontSize: 20, fontWeight: 500 }}>{selected.id}</h2>
-                <span style={{ fontSize: 13, color: "var(--color-text-secondary)" }}>{selected.timezone} · {selected.country}</span>
-              </div>
-              <div style={{ marginLeft: "auto" }}>
-                <Badge label={selected.region} color={regionColors[selected.region]} bg={regionBg[selected.region]} />
-              </div>
-            </div>
-            <div style={s.tabBar}>
-              {["office", "contacts", "tools", "global"].map(t => (
-                <button key={t} style={s.tabBtn(t)} onClick={() => setTab(t)}>
-                  {t === "global" ? "Global docs" : t.charAt(0).toUpperCase() + t.slice(1)}
-                </button>
-              ))}
-            </div>
-          </>
-        )}
-
-        {tab === "office" && selected && (
-          <>
-            <LocalClock timezone={selected.timezone} />
-            <ComposeButtons office={selected} />
-            {selected.travelBrief && (
-              <div style={{ display: "flex", gap: 10, marginBottom: 14, flexWrap: "wrap" }}>
-                <a href={selected.travelBrief} target="_blank" rel="noreferrer"
-                  style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: "var(--border-radius-md)", background: "#0F6E56", color: "#fff", fontSize: 13, fontWeight: 500, textDecoration: "none" }}>
-                  ✈ Travel brief
-                </a>
-                {selected.elasticSearch && (
-                  <a href={selected.elasticSearch} target="_blank" rel="noreferrer"
-                    style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: "var(--border-radius-md)", background: "#0F6E56", color: "#fff", fontSize: 13, fontWeight: 500, textDecoration: "none" }}>
-                    🔍 Elastic search Montreal
-                  </a>
-                )}
-              </div>
-            )}
-            <div style={s.card}>
-              <div style={s.label}>Address</div>
-              <div style={{ fontSize: 14, marginBottom: 12 }}>{selected.address}</div>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                <StatusDot val={selected.accessControl} label="Access control" />
-                <StatusDot val={selected.accessControl === true ? true : false} label="CCTV" />
-                <StatusDot val={selected.groundFloor} label="Ground floor" />
-              </div>
-            </div>
-            <div style={s.card}>
-              <div style={s.label}>PhySec regional manager</div>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <div style={{ fontSize: 14 }}>{selected.physSecManager}</div>
-                <a href={composeUrl(selected.managerEmail, selected.id, RICHARD)} target="_blank" rel="noreferrer"
-                  style={{ fontSize: 12, color: "#185FA5", textDecoration: "none", whiteSpace: "nowrap", padding: "4px 10px", border: "0.5px solid #B5D4F4", borderRadius: "var(--border-radius-md)" }}>
-                  ✉ Email
-                </a>
-              </div>
-            </div>
-            <SecurityCard security={selected.security} />
-            {selected.notes && (
-              <div style={{ ...s.card, background: "#FAEEDA", border: "0.5px solid #EF9F27" }}>
-                <div style={{ ...s.label, color: "#633806" }}>Notes</div>
-                <div style={{ fontSize: 13, color: "#633806" }}>{selected.notes}</div>
-              </div>
-            )}
-          </>
-        )}
-
-        {tab === "contacts" && selected && (
-          <>
-            <ComposeButtons office={selected} />
-
-            <div style={s.card}>
-              <div style={s.label}>Contact list</div>
-              {selected.contacts.length === 0 && (
-                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "32px 20px", gap: 8, textAlign: "center" }}>
-                  <span style={{ fontSize: 28 }}>🕐</span>
-                  <div style={{ fontSize: 14, fontWeight: 500, color: "var(--color-text-primary)" }}>Contacts pending</div>
-                  <div style={{ fontSize: 12, color: "var(--color-text-secondary)", maxWidth: 260 }}>Contact details for this office haven't been added yet. Check back later or update the spreadsheet.</div>
-                </div>
-              )}
-              {selected.contacts.map((c, i) => (
-                <div key={i} style={{ ...s.contactRow, borderBottom: i < selected.contacts.length - 1 ? "0.5px solid var(--color-border-tertiary)" : "none" }}>
-                  <div style={{ width: 36, height: 36, borderRadius: "50%", background: "#E6F1FB", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 500, color: "#185FA5", flexShrink: 0 }}>
-                    {c.name.replace(/[^a-zA-Z ]/g, "").split(" ").filter(Boolean).map(w => w[0]).slice(0, 2).join("")}
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 500, fontSize: 13 }}>{c.name}</div>
-                    <div style={{ fontSize: 12, color: "var(--color-text-secondary)" }}>
-                      ({c.role}){c.phone && c.phone !== "N/A" ? " · " + c.phone : ""}
-                    </div>
-                    {c.note && <div style={{ fontSize: 11, color: "var(--color-text-tertiary)", marginTop: 2 }}>{c.note}</div>}
-                  </div>
-                  {c.email && (
-                    <a href={composeUrl(c.email, selected.id, [VSOC, RICHARD, selected.managerEmail].filter(Boolean))}
-                      target="_blank" rel="noreferrer"
-                      style={{ fontSize: 12, color: "#185FA5", textDecoration: "none", whiteSpace: "nowrap", padding: "4px 10px", border: "0.5px solid #B5D4F4", borderRadius: "var(--border-radius-md)", flexShrink: 0 }}>
-                      ✉ Email
-                    </a>
-                  )}
-                </div>
-              ))}
-            </div>
-
-            <div style={{ ...s.card, marginTop: 14 }}>
-              <div style={s.label}>Critical Emergency PhySec Notification Order</div>
-              {notifOrder.map((n, i) => (
-                <div key={i} style={{ padding: "10px 0", borderBottom: i < notifOrder.length - 1 ? "0.5px solid var(--color-border-tertiary)" : "none" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
-                    <Badge label={n.order} color="#185FA5" bg="#E6F1FB" />
-                    <span style={{ fontWeight: 500, fontSize: 13 }}>{n.name}</span>
-                  </div>
-                  {n.email && <div style={{ fontSize: 12, color: "var(--color-text-secondary)", marginBottom: 2 }}>✉ {n.email} · Slack: {n.slack} · {n.mobile}</div>}
-                  <div style={{ fontSize: 12, color: "var(--color-text-tertiary)" }}>{n.note}</div>
-                </div>
-              ))}
-            </div>
-          </>
-        )}
-
-        {tab === "tools" && selected && (
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            <ToolBtn href={jiraUrl(selected.city)} label="Jira" subtitle={`View tickets for ${selected.city}`} icon="🎯" accent="#185FA5" />
-            <ToolBtn href={selected.tools.confluence} label="Confluence" subtitle={`${selected.city} office wiki`} icon="📘" accent="#0F6E56" />
-            <ToolBtn href={selected.tools.gable} label="Gable" subtitle={`${selected.city} floor plan & booking`} icon="🏢" accent="#D85A30" />
-            <ToolBtn href={HELPDESK} label="Help Desk" subtitle="Unity support portal" icon="🎧" accent="#534AB7" />
-          </div>
-        )}
-
-        {tab === "global" && (
-          <>
-            <div style={s.card}>
-              <div style={s.label}>Key documents</div>
-              {globalDocs.map((d, i) => (
-                <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 0", borderBottom: i < globalDocs.length - 1 ? "0.5px solid var(--color-border-tertiary)" : "none" }}>
-                  <span style={{ fontSize: 13 }}>{d.name}</span>
-                  <a href={d.url} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: "#185FA5", textDecoration: "none", whiteSpace: "nowrap", marginLeft: 12 }}>Open ↗</a>
-                </div>
-              ))}
-            </div>
-
-          </>
-        )}
-      </div>
+      </>}
+      {tab==="tools"&&selected&&<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
+        <ToolBtn href={jiraUrl(selected.city)} label="Jira" subtitle={`View tickets for ${selected.city}`} icon="🎯" accent={th.accent} lightBg={th.accentLight}/>
+        <ToolBtn href={selected.tools.confluence} label="Confluence" subtitle={`${selected.city} office wiki`} icon="📘" accent={th.green} lightBg={th.greenLight}/>
+        <ToolBtn href={selected.tools.gable} label="Gable" subtitle={`${selected.city} floor plan & booking`} icon="🏢" accent="#D97706" lightBg={th.amberLight}/>
+        <ToolBtn href={HELPDESK} label="Help Desk" subtitle="Unity support portal" icon="🎧" accent={th.purple} lightBg={th.purpleLight}/>
+        <ToolBtn href="https://portal.max-security.com/login" label="Max Security" subtitle="Max Security portal" icon="🛡️" accent={th.red} lightBg={th.redLight}/>
+        <ToolBtn href="https://app.dataminr.com/app/dashboard/feeds?pulseweb=true" label="Dataminr" subtitle="Dataminr pulse dashboard" icon="📡" accent="#0EA5E9" lightBg="#F0F9FF"/>
+      </div>}
+      {tab==="global"&&<div style={card}>
+        <div style={lbl}>Key documents</div>
+        {globalDocs.map((d,i)=><div key={i} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 0",borderBottom:i<globalDocs.length-1?`1px solid ${th.cardBorder}`:"none"}}><span style={{fontSize:13,fontWeight:500}}>{d.name}</span><a href={d.url} target="_blank" rel="noreferrer" style={{fontSize:12,color:th.accent,textDecoration:"none",padding:"4px 12px",border:`1px solid ${th.accentBorder}`,borderRadius:7,background:th.accentLight,whiteSpace:"nowrap",marginLeft:12,fontWeight:500}}>Open ↗</a></div>)}
+      </div>}
     </div>
-  );
+  </div>;
 }
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
