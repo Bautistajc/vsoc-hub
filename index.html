@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8"/>
@@ -17,9 +17,10 @@
 </head>
 <body>
   <div id="root"></div>
-  <script type="text/babel">
+  <script type="text/babel" data-presets="react">
     const { useState, useEffect } = React;
-
+ 
+ 
 const EHS = "ehs@unity3d.com";
 const VSOC = "vsoc@unity3d.com";
 const RICHARD = "richard.waldrop@unity3d.com";
@@ -28,10 +29,10 @@ const JOE_SLACK = "U0B8G0CSY5B";
 const ALICE = "alice.orme@unity3d.com";
 const ALICE_SLACK = "U06SDNU591U";
 const HELPDESK = "https://helpdesk.unity3d.com/support/home";
-
+ 
 const jiraUrl = (city) =>
   `https://jira.unity3d.com/issues/?jql=project%3DGBPSD%20AND%20text~%22${encodeURIComponent(city)}%22%20AND%20status%20IN%20(Open%2C%20Closed%2C%20%22In%20Progress%22%2C%20Canceled%2C%20%22Waiting%20for%20Customer%22%2C%20Monitoring%2C%20%22Awaiting%20Approval%22%2C%20Notification%2C%20Pending)%20ORDER%20BY%20created%20DESC`;
-
+ 
 const tzMap = {
   "EDT (UTC-4)":"America/New_York","PDT (UTC-7)":"America/Los_Angeles",
   "CST (UTC+8)":"Asia/Shanghai","IST (UTC+5:30)":"Asia/Kolkata",
@@ -40,7 +41,7 @@ const tzMap = {
   "CEST (UTC+2)":"Europe/Paris","EEST (UTC+3)":"Europe/Helsinki",
   "IDT (UTC+3)":"Asia/Jerusalem","GST (UTC+4)":"Asia/Dubai",
 };
-
+ 
 const lightTheme = {
   bg:"#F0F4F8",sidebar:"#1B2A4A",accent:"#2563EB",accentLight:"#EFF6FF",accentBorder:"#BFDBFE",
   green:"#059669",greenLight:"#ECFDF5",red:"#DC2626",redLight:"#FEF2F2",redBorder:"#FECACA",
@@ -48,7 +49,7 @@ const lightTheme = {
   amber:"#D97706",amberLight:"#FFFBEB",amberBorder:"#FDE68A",
   purple:"#7C3AED",purpleLight:"#F5F3FF",purpleBorder:"#DDD6FE",
 };
-
+ 
 const darkTheme = {
   bg:"#0F172A",sidebar:"#0B1628",accent:"#3B82F6",accentLight:"#1E3A5F",accentBorder:"#1E40AF",
   green:"#10B981",greenLight:"#064E3B",red:"#EF4444",redLight:"#450A0A",redBorder:"#7F1D1D",
@@ -56,24 +57,24 @@ const darkTheme = {
   amber:"#F59E0B",amberLight:"#431407",amberBorder:"#78350F",
   purple:"#A78BFA",purpleLight:"#2E1065",purpleBorder:"#4C1D95",
 };
-
+ 
 const regionColors = {AMER:"#2563EB",APAC:"#059669",EMEA:"#DC2626"};
 const regionBg = {AMER:"#EFF6FF",APAC:"#ECFDF5",EMEA:"#FEF2F2"};
-
+ 
 // PhySec Regional Managers
 const physecManagers = {
   AMER: { name: "Nate Field", title: "Regional Manager, Physical Security", regions: "AMER", email: JOE, slack: JOE_SLACK },
   APAC: { name: "Alice Orme", title: "Regional Manager, Physical Security", regions: "EMEA/APAC", email: ALICE, slack: ALICE_SLACK },
   EMEA: { name: "Alice Orme", title: "Regional Manager, Physical Security", regions: "EMEA/APAC", email: ALICE, slack: ALICE_SLACK },
 };
-
+ 
 // VSOC Regional Specialists per region
 const vsocSpecialists = {
   AMER: { name: "Julio Bautista", title: "Lead Operator", email: "julio.bautista@unity3d.com", slack: "W018V5TG4TF" },
   APAC: { name: "Alberto Brehme", title: "Operator", email: "alberto.brehme@unity3d.com", slack: "" },
   EMEA: { name: "Maria Fisher", title: "Operator", email: "maria.fisher@unity3d.com", slack: "" },
 };
-
+ 
 const officeLinks = {
   "CAN-Montreal":            {travel:"https://portal.max-security.com/city/Montreal(Canada)",elastic:"https://portal.max-security.com/elastic?view=list&text=Montreal"},
   "USA-Mountain View":       {travel:null,elastic:"https://portal.max-security.com/elastic?view=list&text=Mountain+View"},
@@ -102,7 +103,7 @@ const officeLinks = {
   "LTU-Vilnius":             {travel:"https://portal.max-security.com/city/Vilnius(Lithuania)",elastic:"https://portal.max-security.com/elastic?view=list&text=Vilnius"},
   "UAE-Abu Dhabi":           {travel:"https://portal.max-security.com/city/Abu%20Dhabi(UAE)",elastic:"https://portal.max-security.com/elastic?view=list&text=Abu+Dhabi"},
 };
-
+ 
 const offices = [
   {id:"CAN-Montreal",region:"AMER",flag:"🇨🇦",city:"Montreal",country:"Canada",address:"1751 rue Richardson, suite 3500, Montreal, QC H3K 1G6",timezone:"EDT (UTC-4)",accessControl:true,groundFloor:false,physSecManager:"Nate Field",managerEmail:JOE,security:{hasOnsite:true,vendor:"Securitas",contacts:[{name:"Securitas Guard",phone:"514 838 7517",note:"Mon 10am PST–Fri 10pm PST"},{name:"Securitas Patrol",phone:"514 938 3433",note:"Fri 8pm PST–Mon 4am PST"},{name:"Raadin Beedasy (Lead)",phone:"",note:"On Slack, M–F 0700–1500 EDT",slack:"U09GYECQ3AP",email:"raadin.beedasy@unity3d.com"}]},contacts:[{role:"Primary WE",name:"Steve Delmas",phone:"(514) 974-8034",email:"steve.delmas@unity3d.com",slack:"U043F68TKUY"},{role:"Secondary WE",name:"Marvin Polynice",phone:"(438) 503-9282",email:"marvin.polynice@unity3d.com",slack:"U01JQ6S4B8C"},{role:"Alternate WE",name:"Russell Gagnon",phone:"(514) 358-1595",email:"russell.gagnon@unity3d.com",slack:"W018WNRT24A"}],tools:{confluence:"https://confluence.unity3d.com/spaces/HR/pages/500811170/Montreal+Office",gable:"https://app.gable.to/hq/67ec3b33ddb567ed81f2d112"},notes:""},
   {id:"USA-Mountain View",region:"AMER",flag:"🇺🇸",city:"Mountain View",country:"USA",address:"1975 W El Camino Real, Mountain View, CA 94040",timezone:"PDT (UTC-7)",accessControl:false,groundFloor:false,physSecManager:"Nate Field",managerEmail:JOE,security:{hasOnsite:false},contacts:[{role:"Primary WE",name:"Pending",phone:"Pending"},{role:"Secondary WE",name:"Pending",phone:"Pending"}],tools:{confluence:"https://confluence.unity3d.com/spaces/HR/pages/500811217/Mountain+View+Office",gable:"https://app.gable.to/hq/68f290111e23c8ec3d9ddf6c"},notes:""},
@@ -131,7 +132,7 @@ const offices = [
   {id:"LTU-Vilnius",region:"EMEA",flag:"🇱🇹",city:"Vilnius",country:"Lithuania",address:"Unity Technologies Lt, UAB, Konstitucijos ave 21A, Quadrum East, 4th floor, LT-08130, Vilnius, Lithuania",timezone:"EEST (UTC+3)",accessControl:true,groundFloor:false,physSecManager:"Alice Orme",managerEmail:ALICE,security:{hasOnsite:true,vendor:"Eurocash1 UAB",contacts:[{name:"Eurocash1 UAB",phone:"+370 687 20881"}]},contacts:[{role:"Primary WE",name:"Vilius Strikauskas",phone:"N/A",email:"vilius.strikauskas@unity3d.com",slack:"U0AEST93M1T"},{role:"Secondary WE",name:"Justina Rautio",phone:"+358 443282122",email:"justina.rautio@unity3d.com",slack:"W018G2U7SNT"}],tools:{confluence:"https://confluence.unity3d.com/spaces/HR/pages/500811201/Vilnius+Office",gable:"https://app.gable.to/hq/67f3f1cde67d62b06cb74a22"},notes:"East Quadrum: Ina Račkauskaitė east@quadrum.lt"},
   {id:"UAE-Abu Dhabi",region:"EMEA",flag:"🇦🇪",city:"Abu Dhabi",country:"UAE",address:"Khalidiyah Street - Yas Island - YS2 - Abu Dhabi - United Arab Emirates",timezone:"GST (UTC+4)",accessControl:false,groundFloor:false,physSecManager:"Alice Orme",managerEmail:ALICE,security:{hasOnsite:false},contacts:[{role:"Primary WE",name:"Katia Serbina",phone:"N/A",email:"katia.serbina@unity3d.com",slack:"U098413ES13"}],tools:{confluence:null,gable:null},notes:""},
 ];
-
+ 
 const globalDocs = [
   {name:"VSOC Standard Operating Procedures (Update 2025)",url:"https://docs.google.com/document/d/1eZgmxCewBbdXsUEBMffVPkrKY8JQcVYv9YTWm23KIuU/edit?usp=sharing"},
   {name:"VSOC Operations Document",url:"https://docs.google.com/document/d/1wROd18-jVzr0zu_Kv3Wxn2Y_U08faNaFBwj8X2UVlRs/edit?usp=sharing"},
@@ -139,23 +140,23 @@ const globalDocs = [
   {name:"Temporary SOPs",url:"https://docs.google.com/document/d/1p4Pi1AVXF5wzc9meg6O0bQ63Ju6gAUr2Iz7CmLnpjzQ/edit?tab=t.0"},
   {name:"Physical Security Confluence Page",url:"https://confluence.unity3d.com/spaces/HR/pages/500814307/Physical+Security"},
 ];
-
+ 
 const notifOrder = [
   {order:"1. Primary POC",name:"Joe Studley",email:"joe.studley@unity3d.com",slackId:"U03NECGBFTK",mobile:"44 78322 64020",note:"If no response within 20 min, move to Secondary."},
   {order:"2. Secondary POC",name:"Richard Waldrop",email:RICHARD,slackId:"U035YPJ90U9",mobile:"858 204 6975",note:"If no response within 20 min, move to Tertiary."},
   {order:"3. Tertiary POC",name:"Nate Field",email:JOE,slackId:"U0B8G0CSY5B",mobile:"",note:"If no response within 20 min, move to Quaternary."},
   {order:"4. Quaternary POC",name:"Alice Orme",email:ALICE,slackId:"U06SDNU591U",mobile:"44 7919 848697",note:"If no response, repeat until live contact made."},
 ];
-
+ 
 const Badge = ({label,color,bg}) => <span style={{fontSize:11,fontWeight:600,padding:"2px 10px",borderRadius:99,background:bg,color,letterSpacing:0.4}}>{label}</span>;
-
+ 
 const StatusDot = ({val,label,th}) => {
   const color = val===true?th.green:val===false?th.red:"#94A3B8";
   const bg = val===true?th.greenLight:val===false?th.redLight:"#F8FAFC";
   const border = val===true?"#BBF7D0":val===false?th.redBorder:"#E2E8F0";
   return <span style={{display:"inline-flex",alignItems:"center",gap:5,fontSize:12,background:bg,color,borderRadius:99,padding:"3px 10px",fontWeight:500,border:`1px solid ${border}`}}><span style={{width:6,height:6,borderRadius:"50%",background:color,flexShrink:0}}/>{label&&label+": "}{val===true?"Yes":val===false?"No":"?"}</span>;
 };
-
+ 
 const LocalClock = ({timezone}) => {
   const [time,setTime] = useState("");
   const [date,setDate] = useState("");
@@ -167,7 +168,7 @@ const LocalClock = ({timezone}) => {
   if(!iana)return null;
   return <div style={{display:"flex",alignItems:"center",gap:16,padding:"16px 20px",background:"linear-gradient(135deg,#1B2A4A 0%,#2563EB 100%)",borderRadius:12,marginBottom:16,color:"#fff"}}><div style={{fontSize:36,fontWeight:700,fontVariantNumeric:"tabular-nums",letterSpacing:2}}>{time}</div><div><div style={{fontSize:13,opacity:0.9}}>{date}</div><div style={{fontSize:11,opacity:0.6,marginTop:2}}>{timezone}</div></div></div>;
 };
-
+ 
 const SecurityCard = ({security,officeId,th,dark}) => {
   const h = security.hasOnsite;
   const titleColor = dark?"#F1F5F9":h?th.green:th.red;
@@ -192,12 +193,12 @@ const SecurityCard = ({security,officeId,th,dark}) => {
     </div>)}
   </div>;
 };
-
+ 
 const ToolBtn = ({href,label,subtitle,icon,accent,lightBg}) => {
   if(!href) return <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:8,padding:"24px 16px",borderRadius:12,border:"1px solid #E2E8F0",background:"#F8FAFC",opacity:0.5,textAlign:"center"}}><span style={{fontSize:28}}>{icon}</span><span style={{fontSize:13,fontWeight:500,color:"#64748B"}}>{label}</span><span style={{fontSize:11,color:"#94A3B8"}}>No link available</span></div>;
   return <a href={href} target="_blank" rel="noreferrer" style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:8,padding:"24px 16px",borderRadius:12,border:`1.5px solid ${accent}30`,background:lightBg||`${accent}08`,textDecoration:"none",textAlign:"center"}}><span style={{fontSize:28}}>{icon}</span><span style={{fontSize:14,fontWeight:600,color:accent}}>{label}</span><span style={{fontSize:11,color:"#64748B"}}>{subtitle}</span></a>;
 };
-
+ 
 const isOpen = (timezone) => {
   const iana = tzMap[timezone];
   if (!iana) return false;
@@ -206,7 +207,7 @@ const isOpen = (timezone) => {
   const hour = parseInt(now.toLocaleTimeString("en-US", {timeZone:iana, hour:"numeric", hour12:false}));
   return day !== "Sat" && day !== "Sun" && hour >= 8 && hour < 17;
 };
-
+ 
 const PhySecManagerCard = ({region, th, dark, officeId}) => {
   const manager = physecManagers[region];
   if (!manager) return null;
@@ -229,7 +230,7 @@ const PhySecManagerCard = ({region, th, dark, officeId}) => {
     </div>
   );
 };
-
+ 
 const VSOCSpecialistCard = ({region, th, dark, officeId}) => {
   const specialist = vsocSpecialists[region];
   if (!specialist) return null;
@@ -252,14 +253,14 @@ const VSOCSpecialistCard = ({region, th, dark, officeId}) => {
     </div>
   );
 };
-
+ 
 function App() {
   const [search,setSearch] = useState("");
   const [selected,setSelected] = useState(offices[0]);
   const [activeRegion,setActiveRegion] = useState("All");
   const [tab,setTab] = useState("office");
   const [dark,setDark] = useState(false);
-
+ 
   const th = dark ? darkTheme : lightTheme;
   const filtered = offices.filter(o=>(activeRegion==="All"||o.region===activeRegion)&&(o.city.toLowerCase().includes(search.toLowerCase())||o.country.toLowerCase().includes(search.toLowerCase())));
   const links = officeLinks[selected?.id]||{};
@@ -267,7 +268,7 @@ function App() {
   const lbl = {fontSize:11,color:th.textTer,fontWeight:600,textTransform:"uppercase",letterSpacing:0.6,marginBottom:8};
   const btnBlue = {display:"inline-flex",alignItems:"center",gap:6,padding:"8px 16px",borderRadius:8,background:th.accent,color:"#fff",fontSize:13,fontWeight:500,textDecoration:"none"};
   const btnGreen = {display:"inline-flex",alignItems:"center",gap:6,padding:"8px 16px",borderRadius:8,background:th.green,color:"#fff",fontSize:13,fontWeight:500,textDecoration:"none"};
-
+ 
   return <div style={{display:"flex",height:"100vh",fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",fontSize:14,color:th.text,background:th.bg}}>
     <div style={{width:230,flexShrink:0,display:"flex",flexDirection:"column",background:th.sidebar,overflow:"hidden"}}>
       <div style={{padding:"20px 16px 12px",borderBottom:"1px solid rgba(255,255,255,0.08)"}}>
@@ -293,7 +294,7 @@ function App() {
         </div>)}
       </div>
     </div>
-
+ 
     <div style={{flex:1,overflowY:"auto",padding:"24px 28px"}}>
       {selected&&<>
         <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:20,padding:"16px 20px",background:th.card,borderRadius:14,border:`1px solid ${th.cardBorder}`,boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
@@ -305,7 +306,7 @@ function App() {
           {["office","contacts","tools","global"].map(t2=><button key={t2} onClick={()=>setTab(t2)} style={{padding:"7px 18px",fontSize:13,fontWeight:tab===t2?600:400,color:tab===t2?"#fff":th.textSec,background:tab===t2?th.accent:"transparent",border:"none",borderRadius:7,cursor:"pointer"}}>{t2==="global"?"VSOC Docs":t2.charAt(0).toUpperCase()+t2.slice(1)}</button>)}
         </div>
       </>}
-
+ 
       {tab==="office"&&selected&&<>
         <LocalClock timezone={selected.timezone}/>
         {selected.contacts.filter(c=>c.email).length>0&&(()=>{
@@ -327,7 +328,7 @@ function App() {
         <SecurityCard security={selected.security} officeId={selected.id} th={th} dark={dark}/>
         {selected.notes&&<div style={{...card,background:th.amberLight,border:`1px solid ${th.amberBorder}`}}><div style={{...lbl,color:th.amber}}>Notes</div><div style={{fontSize:13,color:dark?"#FCD34D":"#92400E"}}>{selected.notes}</div></div>}
       </>}
-
+ 
       {tab==="contacts"&&selected&&<>
         <div style={card}>
           <div style={lbl}>Contact list</div>
@@ -391,7 +392,7 @@ function App() {
           </div>)}
         </div>
       </>}
-
+ 
       {tab==="tools"&&selected&&<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
         <ToolBtn href={jiraUrl(selected.city)} label="Jira" subtitle={`View tickets for ${selected.city}`} icon="🎯" accent={th.accent} lightBg={th.accentLight}/>
         <ToolBtn href={selected.tools.confluence} label="Confluence" subtitle={`${selected.city} office wiki`} icon="📘" accent={th.green} lightBg={th.greenLight}/>
@@ -400,7 +401,7 @@ function App() {
         <ToolBtn href="https://portal.max-security.com/login" label="Max Security" subtitle="Max Security portal" icon="🛡️" accent={th.red} lightBg={th.redLight}/>
         <ToolBtn href="https://app.dataminr.com/app/dashboard/feeds?pulseweb=true" label="Dataminr" subtitle="Dataminr pulse dashboard" icon="📡" accent="#0EA5E9" lightBg="#F0F9FF"/>
       </div>}
-
+ 
       {tab==="global"&&<div style={card}>
         <div style={lbl}>VSOC Docs</div>
         {globalDocs.map((d,i)=><div key={i} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 0",borderBottom:i<globalDocs.length-1?`1px solid ${th.cardBorder}`:"none"}}>
@@ -411,8 +412,9 @@ function App() {
     </div>
   </div>;
 }
-
-    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+ 
+ 
+    ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App));
   </script>
 </body>
 </html>
